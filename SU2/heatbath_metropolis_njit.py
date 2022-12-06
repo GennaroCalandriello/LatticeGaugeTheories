@@ -233,9 +233,6 @@ def delta_S(U_old, U_new, staple, beta):
 
 @njit()
 def Metropolis_update(staple_start, staple2, beta, U, sx, sy, sz):
-
-    """Da ricontrollare l'accept-reject"""
-
     idecorrel = 20
     for t in range(N):
         for x in range(N):
@@ -358,13 +355,17 @@ if __name__ == "__main__":
     sz = np.array(((1, 0), (0, -1)), complex)
     exe = True
 
-    beta_array = np.linspace(0.1, 12, 20)
+    beta_array = np.linspace(0.1, 12, 4)
 
     idecorrel = 1
-    measures = 100
+    measures = 3
+
+    # print(U)
 
     obsbeta = []
-
+    # U = heatbath_update(beta_array[2], U, staple_start, sx, sy, sz, N)
+    # action=S(1, 1, U)
+    # print(action)
     if exe:
         for beth in beta_array:
             U = init_lattice(1, N)
@@ -375,13 +376,15 @@ if __name__ == "__main__":
 
                 staple_start = np.zeros((su2, su2), complex)
                 staple2 = staple_start.copy()
-                # U = Metropolis_update(staple_start, staple2, beth, U, sx, sy, sz)
-                U = heatbath_update(beth, U, staple_start, sx, sy, sz, N)
+                U = Metropolis_update(staple_start, staple2, beth, U, sx, sy, sz)
+                # U = heatbath_update(beth, U, staple_start, sx, sy, sz, N)
 
                 summ = S(1, 1, U)
                 print(f"Heat-bath measure {m}")
+                # prodo, summ = WilsonLoop(U, beta)
                 obs.append(summ)
                 print(f"Measure of action? {summ}")
+                # print(U)
 
             obsbeta.append(np.mean(obs))
 
