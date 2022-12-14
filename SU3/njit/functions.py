@@ -22,17 +22,17 @@ def SU3_pool_generator(pool_size):
     su2_pool = SU2_pool_generator(pool_size * 3, epsilon=epsilon)
     su3_pool = np.zeros((pool_size, su3, su3), complex)
 
-    for i in range(int(pool_size / 2)):  # half pool RST and half RST. conj.T
+    for i in range(round(pool_size / 2)):  # half pool RST and half RST. conj.T
         r = su2_pool[i]
-        s = su2_pool[i + int(pool_size / 2)]
-        t = su2_pool[i + 2 * int(pool_size / 2)]
+        s = su2_pool[i + round(pool_size / 2)]
+        t = su2_pool[i + 2 * round(pool_size / 2)]
 
         R = np.array(((r[0, 0], r[0, 1], 0), (r[1, 0], r[1, 1], 0), (0, 0, 1)))
         S = np.array(((s[0, 0], 0, s[0, 1]), (0, 1, 0), (s[1, 0], 0, s[1, 1])))
         T = np.array(((1, 0, 0), (0, t[0, 0], t[0, 1]), (0, t[1, 0], t[1, 1])))
 
         su3_pool[i] = R @ S @ T
-        su3_pool[i + int(pool_size / 2)] = (su3_pool[i].conj().T).copy()
+        su3_pool[i + round(pool_size / 2)] = (su3_pool[i].conj().T).copy()
 
     return su3_pool
 
@@ -175,6 +175,7 @@ def gram_schmidt(A):
         #     )
 
         # normalize q
+        # print(np.dot(q, q))
         q = q / np.sqrt(np.dot(q, q))
 
         # write the vector back in the matrix
@@ -246,7 +247,7 @@ def getA(W):
     return Avector
 
 
-@njit()
+# @njit()
 def S(I, J, U):  # costruisce l'azione di Wilson
 
     # !!!!!!!!!!!  WARNING  !!!!!!!!!!
@@ -335,7 +336,6 @@ def S(I, J, U):  # costruisce l'azione di Wilson
 
                             somma += (np.trace(temp)).real / su3
                             mu += 1
-    print("traccia", np.trace(temp).real)
 
     return somma / (6 * N ** 4)
 

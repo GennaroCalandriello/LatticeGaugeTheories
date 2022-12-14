@@ -19,7 +19,7 @@ sz = np.array(((1, 0), (0, -1)), complex)
 
 
 #
-@njit()
+# @njit()
 def updating_links(beta, U, N, staple_start):
 
     for t in range(N):
@@ -40,7 +40,7 @@ def updating_links(beta, U, N, staple_start):
                             )
                         )  # initialize_staple(staple_start)
                         A = staple_calculus(t, x, y, z, mu, U, staple_start)
-                        W = Utemp @ A
+                        W = np.dot(Utemp, A)
 
                         a = det_calculus(W)
 
@@ -55,7 +55,7 @@ def updating_links(beta, U, N, staple_start):
                                 )
                             )
 
-                            W = R @ W
+                            W = np.dot(R, W)
                             s = heatbath_SU3(W, beta)
                             S = np.array(
                                 (
@@ -64,7 +64,7 @@ def updating_links(beta, U, N, staple_start):
                                     (s[1, 0], 0, s[1, 1]),
                                 )
                             )
-                            W = S @ W
+                            W = np.dot(S, W)
 
                             tt = heatbath_SU3(W, beta)
                             T = np.array(
@@ -76,7 +76,7 @@ def updating_links(beta, U, N, staple_start):
                             )
                             # U'=TSRU
 
-                            Uprime = T @ S @ R @ Utemp
+                            Uprime = np.dot(T, np.dot(S, np.dot(R, Utemp)))
 
                             Uprime = gram_schmidt(Uprime)
                             # Q, RR = np.linalg.qr(Uprime)
@@ -90,7 +90,7 @@ def updating_links(beta, U, N, staple_start):
 
 
 @njit()
-def OverRelaxation_update(U, N):
+def OverRelaxation_update(U, N, staple):
 
     """Ettore Vicari, An overrelaxed Monte Carlo algorithm
         for SU (3) lattice gauge theories"""
@@ -111,34 +111,46 @@ def OverRelaxation_update(U, N):
                                 (0 + 0j, 0 + 0j, 0 + 0j),
                             )
                         )
+                        # staple = initialize_staple(staple)
                         A = staple_calculus(t, x, y, z, mu, U, staple)
+                        # print("stapola", np.linalg.norm(staple))
 
-                        a = np.sqrt(np.abs(np.linalg.det(A)))
+                        a = np.sqrt((np.linalg.det(A)))
+                        if a != 0:
+                            A = A / a  # gram_schmidt(A)
 
-                        Adagger = A.conj().T
-                        O = A @ (1 / (Adagger @ A)) ** 0.5
-                        O = gram_schmidt(O)
-                        det_O = np.linalg.det(O.conj().T).real
+                            Adagger = A.conj().T
+                            # print(Adagger @ A)
+                            O = A @ (1 / (Adagger @ A)) ** 0.5
 
-                        if int(det_O) != 0:
+                            O = gram_schmidt(O)
+                            # print(O)
+                            # O, _ = np.linalg.qr(O)
+                            # print('o norm',np.linalg.norm(O)) #ok
 
-                            if int(det_O) == 1:
-                                alpha = 1
-                                Otilde = O @ ((np.identity(su3) + 0j) * alpha)
+                            det_O = np.linalg.det(O.conj().T).real
 
-                            if int(det_O) == -1:
-                                alpha = -1
-                                Otilde = O @ ((np.identity(su3) + 0j) * alpha)
+                            # print(det_O)
 
-                            H = (Adagger @ A) ** 0.5
-                            V = diagonalization(H)
+                            if round(det_O) != 0:
 
-                            Uprime = V @ Utemp @ Otilde @ V.conj().T
-                            # Uprime = gram_schmidt(Uprime)
-                            U[t, x, y, z, mu] = Uprime / np.linalg.norm(Uprime)
+                                if round(det_O) == 1:
+                                    alpha = 1
+                                    Otilde = O @ ((np.identity(su3) + 0j) * alpha)
 
-                        else:
-                            continue
+                                if round(det_O) == -1:
+                                    alpha = -1
+                                    Otilde = O @ ((np.identity(su3) + 0j) * alpha)
+
+                                H = (Adagger @ A) ** 0.5
+                                # print("H norm", np.linalg.norm(H)) ok
+
+                                V = diagonalization(H)
+
+                                Uprime = V @ Utemp @ Otilde @ V.conj().T
+                                Q, R = np.linalg.qr(Uprime)
+                                Uprime = Q
+                                U[t, x, y, z, mu] = Uprime
 
     return U
 
@@ -174,7 +186,7 @@ def heatbath_SU3(W, beta):
 
 
 @njit()
-def Wilson(R, T, U):
+def WilsonAction(R, T, U):
     somma = 0
     for t in range(N):
         for x in range(N):
@@ -266,11 +278,13 @@ def diagonalization(Matrix):
 
 if __name__ == "__main__":
 
-    measures = 100
-    idecorrel = 2
-    beta_vec = np.linspace(1.0, 12, 50)  # np.linspace(3.0, 7, 10)
+    measures = 50
+    idecorrel = 4
+    R = 1
+    T = 1
+    beta_vec = np.linspace(0.1, 12, 40)  # np.linspace(3.0, 7, 10)
     U = initialize_lattice(1, N)
-    overrelax = False
+    overrelax = True
 
     Smean = []
     Smean2 = []
@@ -285,13 +299,14 @@ if __name__ == "__main__":
         obsame = []
 
         for _ in range(measures):
-            U = updating_links(beth, U, N, staple_start)
 
             if overrelax:
                 for _ in range(idecorrel):
-                    U = OverRelaxation_update(U, N)
+                    U = OverRelaxation_update(U, N, staple_start)
 
-            temp = Wilson(1, 1, U)  # W_11(1, 1, U)
+            U = updating_links(beth, U, N, staple_start)
+
+            temp = WilsonAction(R, T, U)
 
             print(temp)
 
