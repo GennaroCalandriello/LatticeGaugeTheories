@@ -18,6 +18,8 @@ sz = np.array(((1, 0), (0, -1)), complex)
 
 def SU3_pool_generator(pool_size):
 
+    """Generate a pool of SU(3) matrices starting from the subgroup SU(2) and projecting on SU(3)"""
+
     # following pag 83 Gattringer
     su2_pool = SU2_pool_generator(pool_size * 3, epsilon=epsilon)
     su3_pool = np.zeros((pool_size, su3, su3), complex)
@@ -39,6 +41,8 @@ def SU3_pool_generator(pool_size):
 
 def initialize_lattice(start, N):
 
+    '''Name says'''
+
     U = np.zeros((N, N, N, N, 4, su3, su3), complex)
     su3_pool = SU3_pool_generator(pool_size=pool_size)
 
@@ -58,6 +62,8 @@ def initialize_lattice(start, N):
 
 @njit()
 def staple_calculus(t, x, y, z, mu, U, staple_start):
+
+    """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
     # staple_start = np.zeros((su3, su3), complex)
     a_mu = [0, 0, 0, 0]
     a_mu[mu] = 1
@@ -129,6 +135,8 @@ def staple_calculus(t, x, y, z, mu, U, staple_start):
 @njit()
 def initialize_staple(staple_start):
 
+    """Initialize staple; it's fundamental before each calculus on each link variable"""
+
     for i in range(su3):
         for j in range(su3):
             staple_start[i, j] = 0 + 0j
@@ -138,6 +146,9 @@ def initialize_staple(staple_start):
 
 @njit()
 def det_calculus(W, manual=False):
+
+    """Calculate determinant manually or through linalg"""
+
     if manual:
         if len(W[:, 0]) == 3:
             det1 = (
@@ -160,6 +171,8 @@ def det_calculus(W, manual=False):
 @njit()
 def gram_schmidt(A):
 
+    """Gram-Schmidt decomposition"""
+
     (n, m) = A.shape
 
     for i in range(m):
@@ -175,7 +188,6 @@ def gram_schmidt(A):
         #     )
 
         # normalize q
-        # print(np.dot(q, q))
         q = q / np.sqrt(np.dot(q, q))
 
         # write the vector back in the matrix
@@ -188,8 +200,6 @@ def gram_schmidt(A):
 def quaternion(vec):
 
     """produces quaternion from a vector of complex and real numbers"""
-
-    # vec = vec / np.linalg.norm(vec)
 
     a11 = vec[0] + vec[3] * 1j
     a12 = vec[2] + vec[1] * 1j
@@ -204,7 +214,8 @@ def quaternion(vec):
 @njit()
 def sampleA(a, beta):
 
-    # choose a0 with P(a0) ~ sqrt(1 - a0^2) * exp(beta * k * a0)
+    """choose a0 with P(a0) ~ sqrt(1 - a0^2) * exp(beta * k * a0)"""
+
     w = np.exp(-2 * beta * a)
     xtrial = np.random.uniform(0, 1) * (1 - w) + w
     a0 = 1 + np.log(xtrial) / (beta * a)
@@ -230,13 +241,14 @@ def sampleA(a, beta):
     a3 = a3 * r / norm
 
     avec = np.array((a0, a1, a2, a3))
-    # print("avemaria", avec)
 
     return avec
 
 
 @njit()
 def getA(W):
+
+    """Construct the vector needed for the quaternion"""
 
     a0 = ((W[0, 0] + W[1, 1])).real / 2
     a1 = ((W[0, 1] + W[1, 0])).imag / 2
@@ -247,8 +259,27 @@ def getA(W):
     return Avector
 
 
+@njit()
+def PeriodicBC(U, t, x, y, z, N):
+
+    """Impose Periodic Boundary conditions, to be checked, one moment please!"""
+
+    if t == N - 1:
+        U[t, x, y, z] = U[0, x, y, z]
+    if x == N - 1:
+        U[t, x, y, z] = U[t, 0, y, z]
+    if y == N - 1:
+        U[t, x, y, z] = U[t, x, 0, z]
+    if z == N - 1:
+        U[t, x, y, z] = U[t, x, y, 0]
+
+    return U[t, x, y, z]
+
+
 # @njit()
-def S(I, J, U):  # costruisce l'azione di Wilson
+def S(I, J, U):
+
+    """Construct the Wilson Action, but should be recontrolled. For now you should refer to the method WilsonAction"""
 
     # !!!!!!!!!!!  WARNING  !!!!!!!!!!
     somma = 0
@@ -257,13 +288,7 @@ def S(I, J, U):  # costruisce l'azione di Wilson
             for y in range(N):
                 for z in range(N):
 
-                    # mmmmmh da rivedere################
-                    # U[N - 1, x, y, z] = U[0, x, y, z]
-                    # U[t, N - 1, y, z] = U[t, 0, y, z]
-                    # U[t, x, N - 1, z] = U[t, x, 0, z]
-                    # U[t, x, y, N - 1] = U[t, x, y, 0]
-                    # ###################################
-
+                    U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
                     for nu in range(4):
 
                         a_nu = [0, 0, 0, 0]

@@ -19,8 +19,10 @@ sz = np.array(((1, 0), (0, -1)), complex)
 
 
 #
-# @njit()
+@njit()
 def updating_links(beta, U, N, staple_start):
+
+    """Update each link via the heatbath algorithm"""
 
     for t in range(N):
         for x in range(N):
@@ -28,17 +30,20 @@ def updating_links(beta, U, N, staple_start):
                 for z in range(N):
                     for mu in range(4):
 
-                        # l'idea è creare 3 heatbath annidati in modo da estrarre R dall'heatbath di W=UA, S dall'heathbath di W=RUA e T dall'heathbath di W=SRUA
-                        # staple_start = initialize_staple(staple_start)
+                        # l'idea è creare 3 heatbath 'annidati'
+                        # in modo da estrarre R dall'heatbath di W=UA,
+                        # S dall'heathbath di W=RUA e T dall'heathbath di W=SRUA
+
                         Utemp = U[t, x, y, z, mu]
 
+                        # staple must be initialized for each calculus
                         staple_start = np.array(
                             (
                                 (0 + 0j, 0 + 0j, 0 + 0j),
                                 (0 + 0j, 0 + 0j, 0 + 0j),
                                 (0 + 0j, 0 + 0j, 0 + 0j),
                             )
-                        )  # initialize_staple(staple_start)
+                        )
                         A = staple_calculus(t, x, y, z, mu, U, staple_start)
                         W = np.dot(Utemp, A)
 
@@ -93,9 +98,9 @@ def updating_links(beta, U, N, staple_start):
 def OverRelaxation_update(U, N, staple):
 
     """Ettore Vicari, An overrelaxed Monte Carlo algorithm
-        for SU (3) lattice gauge theories"""
+        for SU(3) lattice gauge theories"""
 
-    # I don't think that it works!
+    # I don't know if it works good!
     somma = 0
     for t in range(N):
         for x in range(N):
@@ -111,52 +116,90 @@ def OverRelaxation_update(U, N, staple):
                                 (0 + 0j, 0 + 0j, 0 + 0j),
                             )
                         )
-                        # staple = initialize_staple(staple)
+
                         A = staple_calculus(t, x, y, z, mu, U, staple)
-                        # print("stapola", np.linalg.norm(staple))
 
                         a = np.sqrt((np.linalg.det(A)))
                         if a != 0:
-                            A = A / a  # gram_schmidt(A)
+                            A = A / a
 
                             Adagger = A.conj().T
-                            # print(Adagger @ A)
-                            O = A @ (1 / (Adagger @ A)) ** 0.5
+
+                            O = A @ (1 / Adagger @ A) ** 0.5
 
                             O = gram_schmidt(O)
-                            # print(O)
-                            # O, _ = np.linalg.qr(O)
-                            # print('o norm',np.linalg.norm(O)) #ok
 
                             det_O = np.linalg.det(O.conj().T).real
-
-                            # print(det_O)
 
                             if round(det_O) != 0:
 
                                 if round(det_O) == 1:
                                     alpha = 1
-                                    Otilde = O @ ((np.identity(su3) + 0j) * alpha)
+                                    Otilde = np.dot(
+                                        O, ((np.identity(su3) + 0j) * alpha)
+                                    )
 
                                 if round(det_O) == -1:
                                     alpha = -1
-                                    Otilde = O @ ((np.identity(su3) + 0j) * alpha)
+                                    Otilde = np.dot(
+                                        O, ((np.identity(su3) + 0j) * alpha)
+                                    )
 
-                                H = (Adagger @ A) ** 0.5
+                                H = np.dot(Adagger, A) ** 0.5
                                 # print("H norm", np.linalg.norm(H)) ok
 
                                 V = diagonalization(H)
 
-                                Uprime = V @ Utemp @ Otilde @ V.conj().T
-                                Q, R = np.linalg.qr(Uprime)
-                                Uprime = Q
-                                U[t, x, y, z, mu] = Uprime
+                                Uprime = np.dot(
+                                    V, np.dot(Utemp, np.dot(Otilde, V.conj().T))
+                                )
+                                Uprime = reflectionSU3(Uprime, np.random.randint(1, 4))
+                                Uprime, _ = np.linalg.qr(Uprime)
+
+                                Ufinal = np.dot(
+                                    V.conj().T,
+                                    np.dot(Uprime, np.dot(V, Otilde.conj().T)),
+                                )
+                                Q, R = np.linalg.qr(Ufinal)
+                                Ufinal = Q
+                                U[t, x, y, z, mu] = Ufinal
+    # print("Ufinal", Ufinal)
+    # print("spezzo")
+    # print("Uprime", Uprime)
+
+    return U
+
+
+@njit()
+def reflectionSU3(U, reflection):
+
+    """This function reflects the off-diagonal element of the matrix for the Over Relaxation algorithm
+        Any of the below reflection operations leads to the definition of a new group element having the 
+        same energy of the original one. The reflection can be selected randomly"""
+
+    if reflection == 1:
+        U[0, 1] = -U[0, 1]
+        U[1, 0] = -U[1, 0]
+        U[0, 2] = -U[0, 2]
+        U[2, 0] = -U[2, 0]
+    if reflection == 2:
+        U[0, 1] = -U[0, 1]
+        U[1, 0] = -U[1, 0]
+        U[1, 2] = -U[1, 2]
+        U[2, 1] = -U[2, 1]
+    if reflection == 3:
+        U[0, 2] = -U[0, 2]
+        U[2, 0] = -U[2, 0]
+        U[1, 2] = -U[1, 2]
+        U[2, 1] = -U[2, 1]
 
     return U
 
 
 @njit()
 def heatbath_SU3(W, beta):
+
+    """Construct the heatbath update for the link variable, see Gattringer for some details"""
 
     # print(W)
     w = getA(W)
@@ -187,11 +230,16 @@ def heatbath_SU3(W, beta):
 
 @njit()
 def WilsonAction(R, T, U):
+
+    """Name says"""
+
     somma = 0
     for t in range(N):
         for x in range(N):
             for y in range(N):
                 for z in range(N):
+
+                    U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
 
                     for mu in range(4):
 
@@ -234,6 +282,9 @@ def WilsonAction(R, T, U):
                                             nu,
                                         ],
                                     )
+
+                                # sono questi due for loops che non mi convincono affatto!
+                                # almeno non per loop di Wilson più grandi della singola plaquette
 
                                 for i in range(R - 1, -1, -1):
                                     loop = np.dot(
@@ -282,7 +333,7 @@ if __name__ == "__main__":
     idecorrel = 4
     R = 1
     T = 1
-    beta_vec = np.linspace(0.1, 12, 40)  # np.linspace(3.0, 7, 10)
+    beta_vec = np.linspace(1.0, 12, 35)  # np.linspace(3.0, 7, 10)
     U = initialize_lattice(1, N)
     overrelax = True
 
@@ -303,7 +354,6 @@ if __name__ == "__main__":
             if overrelax:
                 for _ in range(idecorrel):
                     U = OverRelaxation_update(U, N, staple_start)
-
             U = updating_links(beth, U, N, staple_start)
 
             temp = WilsonAction(R, T, U)
@@ -316,7 +366,10 @@ if __name__ == "__main__":
         # Smean2.append(np.mean(obsame))
 
     plt.figure()
-    plt.title(f"Average action for N = {N}, measures = {measures}", fontsize=17)
+    plt.title(
+        f"Average action for N = {N}, measures = {measures} for {len(beta_vec)} different betas",
+        fontsize=17,
+    )
     plt.plot(beta_vec, Smean, "go--")
     plt.xlabel(r"$\beta$")
     plt.ylabel(r"<$S_{W_{11}}$>")
