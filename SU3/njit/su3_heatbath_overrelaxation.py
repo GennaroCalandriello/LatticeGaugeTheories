@@ -28,6 +28,9 @@ def updating_links(beta, U, N, staple_start):
         for x in range(N):
             for y in range(N):
                 for z in range(N):
+
+                    # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
+
                     for mu in range(4):
 
                         # l'idea è creare 3 heatbath 'annidati'
@@ -44,6 +47,7 @@ def updating_links(beta, U, N, staple_start):
                                 (0 + 0j, 0 + 0j, 0 + 0j),
                             )
                         )
+
                         A = staple_calculus(t, x, y, z, mu, U, staple_start)
                         W = np.dot(Utemp, A)
 
@@ -82,12 +86,10 @@ def updating_links(beta, U, N, staple_start):
                             # U'=TSRU
 
                             Uprime = np.dot(T, np.dot(S, np.dot(R, Utemp)))
-
-                            Uprime = gram_schmidt(Uprime)
-                            # Q, RR = np.linalg.qr(Uprime)
-                            # Uprime = Q
+                            Uprime = GramSchmidt(Uprime, True)
 
                             U[t, x, y, z, mu] = Uprime
+
                         else:
                             continue
 
@@ -106,7 +108,11 @@ def OverRelaxation_update(U, N, staple):
         for x in range(N):
             for y in range(N):
                 for z in range(N):
+
+                    # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
+
                     for mu in range(4):
+
                         Utemp = U[t, x, y, z, mu]
 
                         staple = np.array(
@@ -118,80 +124,51 @@ def OverRelaxation_update(U, N, staple):
                         )
 
                         A = staple_calculus(t, x, y, z, mu, U, staple)
-
                         a = np.sqrt((np.linalg.det(A)))
+
                         if a != 0:
+
                             A = A / a
-
                             Adagger = A.conj().T
+                            H = np.dot(Adagger, A) ** 0.5
+                            O = A @ (1 / H)
 
-                            O = A @ (1 / Adagger @ A) ** 0.5
-
-                            O = gram_schmidt(O)
-
+                            # with exe=False the matrix is only normalized
+                            O = GramSchmidt(O, False)
                             det_O = np.linalg.det(O.conj().T).real
 
                             if round(det_O) != 0:
 
                                 if round(det_O) == 1:
-                                    alpha = 1
-                                    Otilde = np.dot(
-                                        O, ((np.identity(su3) + 0j) * alpha)
-                                    )
+                                    I_alpha = (np.identity(su3) + 0j) * (1)
+                                    Otilde = np.dot(O, I_alpha)
 
                                 if round(det_O) == -1:
-                                    alpha = -1
-                                    Otilde = np.dot(
-                                        O, ((np.identity(su3) + 0j) * alpha)
-                                    )
-
-                                H = np.dot(Adagger, A) ** 0.5
-                                # print("H norm", np.linalg.norm(H)) ok
+                                    I_alpha = (np.identity(su3) + 0j) * (-1)
+                                    Otilde = np.dot(O, I_alpha)
 
                                 V = diagonalization(H)
 
-                                Uprime = np.dot(
-                                    V, np.dot(Utemp, np.dot(Otilde, V.conj().T))
-                                )
-                                Uprime = reflectionSU3(Uprime, np.random.randint(1, 4))
-                                Uprime, _ = np.linalg.qr(Uprime)
+                                Uprime = np.dot(V, np.dot(Utemp, np.dot(O, V.conj().T)))
 
+                                reflection = np.random.randint(1, 4)
+
+                                Uprime = reflectionSU3(Uprime, reflection)
                                 Ufinal = np.dot(
-                                    V.conj().T,
-                                    np.dot(Uprime, np.dot(V, Otilde.conj().T)),
+                                    V.conj().T, np.dot(Uprime, np.dot(V, O.conj().T)),
                                 )
-                                Q, R = np.linalg.qr(Ufinal)
-                                Ufinal = Q
+
+                                detU = np.linalg.det(Ufinal).real
+
+                                if round(detU) == 1:
+                                    I_alpha = (np.identity(su3) + 0j) * (1)
+                                    Ufinal = np.dot(Ufinal, I_alpha)
+
+                                if round(detU) == -1:
+                                    I_alpha = (np.identity(su3) + 0j) * (-1)
+                                    Ufinal = np.dot(Ufinal, I_alpha)
+
                                 U[t, x, y, z, mu] = Ufinal
-    # print("Ufinal", Ufinal)
-    # print("spezzo")
-    # print("Uprime", Uprime)
-
-    return U
-
-
-@njit()
-def reflectionSU3(U, reflection):
-
-    """This function reflects the off-diagonal element of the matrix for the Over Relaxation algorithm
-        Any of the below reflection operations leads to the definition of a new group element having the 
-        same energy of the original one. The reflection can be selected randomly"""
-
-    if reflection == 1:
-        U[0, 1] = -U[0, 1]
-        U[1, 0] = -U[1, 0]
-        U[0, 2] = -U[0, 2]
-        U[2, 0] = -U[2, 0]
-    if reflection == 2:
-        U[0, 1] = -U[0, 1]
-        U[1, 0] = -U[1, 0]
-        U[1, 2] = -U[1, 2]
-        U[2, 1] = -U[2, 1]
-    if reflection == 3:
-        U[0, 2] = -U[0, 2]
-        U[2, 0] = -U[2, 0]
-        U[1, 2] = -U[1, 2]
-        U[2, 1] = -U[2, 1]
 
     return U
 
@@ -239,7 +216,7 @@ def WilsonAction(R, T, U):
             for y in range(N):
                 for z in range(N):
 
-                    U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
+                    # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
 
                     for mu in range(4):
 
@@ -329,11 +306,11 @@ def diagonalization(Matrix):
 
 if __name__ == "__main__":
 
-    measures = 50
+    measures = 80
     idecorrel = 4
     R = 1
     T = 1
-    beta_vec = np.linspace(1.0, 12, 35)  # np.linspace(3.0, 7, 10)
+    beta_vec = np.linspace(1.0, 10, 50)  # np.linspace(3.0, 7, 10)
     U = initialize_lattice(1, N)
     overrelax = True
 
@@ -350,24 +327,22 @@ if __name__ == "__main__":
         obsame = []
 
         for _ in range(measures):
+            U = updating_links(beth, U, N, staple_start)
 
             if overrelax:
                 for _ in range(idecorrel):
                     U = OverRelaxation_update(U, N, staple_start)
-            U = updating_links(beth, U, N, staple_start)
 
             temp = WilsonAction(R, T, U)
 
             print(temp)
 
             obs.append(temp)
-            # obsame.append(temp1)
         Smean.append(np.mean(obs))
-        # Smean2.append(np.mean(obsame))
 
     plt.figure()
     plt.title(
-        f"Average action for N = {N}, measures = {measures} for {len(beta_vec)} different betas",
+        f"Average action for N = {N}, measures = {measures} for beta in [{min(beta_vec)},{max(beta_vec)}]",
         fontsize=17,
     )
     plt.plot(beta_vec, Smean, "go--")

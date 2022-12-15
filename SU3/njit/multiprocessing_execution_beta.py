@@ -12,7 +12,7 @@ import parameters as par
 
 def main_exe(beta):
 
-    measures = 100
+    measures = 50
     N = 5
     idecorrel = 4
     print(f"Executing for beta = {beta}")

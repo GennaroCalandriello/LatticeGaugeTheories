@@ -41,7 +41,7 @@ def SU3_pool_generator(pool_size):
 
 def initialize_lattice(start, N):
 
-    '''Name says'''
+    """Name says"""
 
     U = np.zeros((N, N, N, N, 4, su3, su3), complex)
     su3_pool = SU3_pool_generator(pool_size=pool_size)
@@ -145,6 +145,32 @@ def initialize_staple(staple_start):
 
 
 @njit()
+def reflectionSU3(U, reflection):
+
+    """This function reflects the off-diagonal element of the matrix for the Over Relaxation algorithm
+        Any of the below reflection operations leads to the definition of a new group element having the 
+        same energy of the original one. The reflection can be selected randomly"""
+
+    if reflection == 1:
+        U[0, 1] = -U[0, 1]
+        U[1, 0] = -U[1, 0]
+        U[0, 2] = -U[0, 2]
+        U[2, 0] = -U[2, 0]
+    if reflection == 2:
+        U[0, 1] = -U[0, 1]
+        U[1, 0] = -U[1, 0]
+        U[1, 2] = -U[1, 2]
+        U[2, 1] = -U[2, 1]
+    if reflection == 3:
+        U[0, 2] = -U[0, 2]
+        U[2, 0] = -U[2, 0]
+        U[1, 2] = -U[1, 2]
+        U[2, 1] = -U[2, 1]
+
+    return U
+
+
+@njit()
 def det_calculus(W, manual=False):
 
     """Calculate determinant manually or through linalg"""
@@ -166,6 +192,35 @@ def det_calculus(W, manual=False):
         det1 = np.linalg.det(W)
 
     return det1
+
+
+@njit()
+def normalize(v):
+
+    return v / np.sqrt(v.dot(v))
+
+
+@njit()
+def GramSchmidt(A, exe):
+
+    n = len(A)
+
+    if exe:
+        A[:, 0] = normalize(A[:, 0])
+
+        for i in range(1, n):
+            Ai = A[:, i]
+            for j in range(0, i):
+                Aj = A[:, j]
+                t = Ai.dot(Aj)
+                Ai = Ai - t * Aj
+            A[:, i] = normalize(Ai)
+    else:
+        for k in range(n):
+            # print(np.linalg.norm(A[:, k]))
+            A[:, k] = A[:, k] / np.linalg.norm(A[:, k])
+
+    return A
 
 
 @njit()
@@ -272,6 +327,11 @@ def PeriodicBC(U, t, x, y, z, N):
         U[t, x, y, z] = U[t, x, 0, z]
     if z == N - 1:
         U[t, x, y, z] = U[t, x, y, 0]
+
+    # U[N-1, x, y, z]=U[0, x, y, z]
+    # U[t, N-1, y, z]=U[t, 0, y, z]
+    # U[t, x, N-1, z]=U[t, x, 0, z]
+    # U[t, x, y, N-1]=U[t, x, y, 0]
 
     return U[t, x, y, z]
 
