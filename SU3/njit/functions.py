@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit, float64
+from numba import njit, float64, int64
 
 from algebra import *
 from randomSU2 import *
@@ -39,6 +39,61 @@ def SU3_pool_generator(pool_size):
     return su3_pool
 
 
+@njit()
+def SU2SingleMatrix():
+
+    # SU2Matrix = np.array(((0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j)))
+    # SU2Matrix = np.empty((2, 2)) + 0j
+
+    r0 = np.random.uniform(-0.5, 0.5)
+    x0 = np.sign(r0) * np.sqrt(1 - epsilon ** 2)
+
+    r = np.random.random((3)) - 0.5
+    x = epsilon * r / np.linalg.norm(r)
+
+    SU2Matrix = x0 * np.identity(2) + 1j * x[0] * sx + 1j * x[1] * sy + 1j * x[2] * sz
+
+    return SU2Matrix
+
+
+@njit()
+def checkSU3(O):
+    det_O = np.linalg.det(O).real
+    det_O = round(det_O)
+
+    if det_O == 1:
+        I_alpha = (np.identity(su3) + 0j) * (1)
+        Otilde = np.dot(O, I_alpha)
+
+    if det_O == -1:
+        I_alpha = (np.identity(su3) + 0j) * (-1)
+        Otilde = np.dot(O, I_alpha)
+    return Otilde
+
+
+@njit()
+def SU3SingleMatrix():
+
+    rr = SU2SingleMatrix()
+    ss = SU2SingleMatrix()
+    tt = SU2SingleMatrix()
+
+    # SU3Matrix = np.array(
+    #     ((0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j))
+    # )
+    # Su3Matrix = np.empty((3, 3)) + 0j
+    R = np.array(((rr[0, 0], rr[0, 1], 0), (rr[1, 0], rr[1, 1], 0), (0, 0, 1)))
+    S = np.array(((ss[0, 0], 0, ss[0, 1]), (0, 1, 0), (ss[1, 0], 0, ss[1, 1])))
+    T = np.array(((1, 0, 0), (0, tt[0, 0], tt[0, 1]), (0, tt[1, 0], tt[1, 1])))
+
+    if np.random.randint(0, 2) == 0:
+        SU3Matrix = R @ S @ T
+    else:
+        SU3Matrix = (R @ S @ T).conj().T
+
+    return SU3Matrix
+
+
 def initialize_lattice(start, N):
 
     """Name says"""
@@ -61,19 +116,21 @@ def initialize_lattice(start, N):
 
 
 @njit()
-def staple_calculus(t, x, y, z, mu, U, staple_start):
+def staple_calculus(t, x, y, z, mu, U):
 
     """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
     # staple_start = np.zeros((su3, su3), complex)
+    staple_start = np.array(
+        ((0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j),)
+    )
+    # staple_start = np.empty((3, 3)) + 0j
+
     a_mu = [0, 0, 0, 0]
     a_mu[mu] = 1
 
     for nu in range(4):
 
-        # if mu == nu:
-        #     continue
-        # else:
-        if nu != mu:
+        if mu != nu:
             # nu = 0
             # while nu < mu:
             a_nu = [0, 0, 0, 0]
@@ -128,6 +185,8 @@ def staple_calculus(t, x, y, z, mu, U, staple_start):
                 ]
             )
             # nu += 1
+        else:
+            continue
 
     return staple_start
 
@@ -202,6 +261,7 @@ def normalize(v):
 
 @njit()
 def GramSchmidt(A, exe):
+    '''GS orthogonalization, if exe==False => the function normalizes only'''
 
     n = len(A)
 
@@ -296,6 +356,7 @@ def sampleA(a, beta):
     a3 = a3 * r / norm
 
     avec = np.array((a0, a1, a2, a3))
+    avec = normalize(avec)
 
     return avec
 
@@ -336,7 +397,7 @@ def PeriodicBC(U, t, x, y, z, N):
     return U[t, x, y, z]
 
 
-# @njit()
+# #@njit()
 def S(I, J, U):
 
     """Construct the Wilson Action, but should be recontrolled. For now you should refer to the method WilsonAction"""
@@ -428,3 +489,6 @@ def S(I, J, U):
 # U = initialize_lattice(1, 5)
 # gramschmidt2puntozero(U[0, 0, 0, 1, 1])
 
+if __name__ == "__main__":
+    su3 = SU3SingleMatrix()
+    print(su3)
