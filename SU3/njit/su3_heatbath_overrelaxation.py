@@ -120,19 +120,20 @@ def OverRelaxation_update(U, N):
                             H = np.dot(Adagger, A) ** 0.5
                             O = A @ (1 / H)
 
-                            # with exe=False the matrix is only normalized
-                            O = GramSchmidt(O, False)
+                            O = GramSchmidt(
+                                O, exe=False
+                            )  # with exe=False the matrix is only normalized
                             det_O = np.linalg.det(O.conj().T).real
 
                             if round(det_O) != 0:
 
-                                if round(det_O) == 1:
-                                    I_alpha = (np.identity(su3) + 0j) * (1)
-                                    Otilde = np.dot(O, I_alpha)
+                                # if round(det_O) == 1:
+                                #     I_alpha = (np.identity(su3) + 0j) * (1)
+                                #     Otilde = np.dot(O, I_alpha)
 
-                                if round(det_O) == -1:
-                                    I_alpha = (np.identity(su3) + 0j) * (-1)
-                                    Otilde = np.dot(O, I_alpha)
+                                # if round(det_O) == -1:
+                                #     I_alpha = (np.identity(su3) + 0j) * (-1)
+                                #     Otilde = np.dot(O, I_alpha)
 
                                 V = diagonalization(H)
 
@@ -181,7 +182,6 @@ def heatbath_SU3(W, beta):
         return xx
 
     else:
-        print("è zèro!")
         r0 = np.random.uniform(-0.5, 0.5)
         x0 = np.sign(r0) * np.sqrt(1 - epsilon ** 2)
 
@@ -319,7 +319,7 @@ def Metropolis(U, beta, sweeps):
                             dS = S_new - S_old
 
                             if dS < 0:
-                                U[t, x, y, z, mu] = old_link
+                                U[t, x, y, z, mu] = new_link
                             else:
                                 if np.exp(-dS) > np.random.uniform(0, 1):
                                     U[t, x, y, z, mu] = new_link
@@ -340,14 +340,18 @@ if __name__ == "__main__":
 
     import time
 
-    measures = 50
-    idecorrel = 4
+    measures = par.measures
+    idecorrel = par.idecorrel
+
     R = 1
     T = 1
-    beta_vec = (np.linspace(0.1, 6, 100)).tolist()
+    beta_vec = (np.linspace(0.1, 8, 100)).tolist()
     U = initialize_lattice(1, N)
-    overrelax = True
-    metropolis = False
+
+    # which kind of link update would you like to use?
+    overrelax = False
+    metropolis = True
+    heatbath = False
 
     Smean = []
     Smean2 = []
@@ -364,7 +368,9 @@ if __name__ == "__main__":
         obsame = []
 
         for _ in range(measures):
-            U = HB_updating_links(beth, U, N)
+
+            if heatbath:
+                U = HB_updating_links(beth, U, N)
 
             if metropolis:
                 U = Metropolis(U, beth, sweeps=10)
