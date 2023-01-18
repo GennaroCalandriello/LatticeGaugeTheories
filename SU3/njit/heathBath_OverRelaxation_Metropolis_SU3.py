@@ -10,7 +10,7 @@ import parameters as par
 su3 = par.su3
 su2 = par.su2
 epsilon = par.epsilon
-N = par.N
+N = 5
 pool_size = par.pool_size
 
 sx = np.array(((0, 1), (1, 0)), complex)
@@ -47,7 +47,7 @@ def HB_updating_links(beta, U, N):
 
                         if a != 0:
                             # else:
-                            r = heatbath_SU3(W, beta)
+                            r = heatbath_SU3(W, beta, "R")
                             R = np.array(
                                 (
                                     (r[0, 0], r[0, 1], 0),
@@ -57,7 +57,8 @@ def HB_updating_links(beta, U, N):
                             )
 
                             W = np.dot(R, W)
-                            s = heatbath_SU3(W, beta)
+                            s = heatbath_SU3(W, beta, "S")
+
                             S = np.array(
                                 (
                                     (s[0, 0], 0, s[0, 1]),
@@ -65,9 +66,11 @@ def HB_updating_links(beta, U, N):
                                     (s[1, 0], 0, s[1, 1]),
                                 )
                             )
+
                             W = np.dot(S, W)
 
-                            tt = heatbath_SU3(W, beta)
+                            tt = heatbath_SU3(W, beta, "T")
+
                             T = np.array(
                                 (
                                     (1, 0, 0),
@@ -76,13 +79,7 @@ def HB_updating_links(beta, U, N):
                                 )
                             )
                             # U'=TSRU
-
-                            Uprime = np.dot(T, np.dot(S, np.dot(R, Utemp)))
-                            # print(np.linalg.det(Uprime))
-                            Uprime = GramSchmidt(Uprime, True)
-                            Uprime = checkSU3(Uprime)
-                            # Uprime = normalize(Uprime)
-
+                            Uprime = T @ S @ R @ Utemp
                             U[t, x, y, z, mu] = Uprime
 
                         else:
@@ -162,35 +159,73 @@ def OverRelaxation_update(U, N):
 
 
 @njit()
-def heatbath_SU3(W, beta):
+def heatbath_SU3(W, beta, subgrp, kind=1):
 
-    """Construct the heatbath update for the link variable, see Gattringer for some details"""
+    """Execute Heat Bath on each of three submatrices of SU(3) (R, S; and T) through the quaternion representation. HB 
+    extracts the SU(2) matrix directly from the distribution that leaves the Haar measure invariant"""
 
-    # print(W)
-    w = getA(W)
+    if subgrp == "R":
+        Wsub = np.array(((W[0, 0], W[0, 1]), (W[1, 0], W[1, 1])))
+    if subgrp == "S":
+        Wsub = np.array(((W[0, 0], W[0, 2]), (W[2, 0], W[2, 2])))
+    if subgrp == "T":
+        Wsub = np.array(((W[1, 1], W[1, 2]), (W[2, 1], W[2, 2])))
 
-    a = np.sqrt(np.abs(det_calculus(W)))
+    if kind == 1:
+        w = getA(Wsub)
+        a = np.sqrt(np.abs(np.linalg.det(Wsub)))
+        wbar = quaternion(normalize(w))
 
-    if a != 0:
-        wbar = quaternion(w)
-        wbar = GramSchmidt(wbar, False)
+        if a != 0:
+            xw = quaternion(sampleA(beta * 2 / 3, a))
 
-        # if a != 0:
-        xw = quaternion(sampleA(beta, a))
-        xx = xw * wbar.conj().T
+            xx = xw @ wbar.conj().T  ###!!!!warning!!!
 
-        return xx
+            return xx
 
-    else:
-        r0 = np.random.uniform(-0.5, 0.5)
-        x0 = np.sign(r0) * np.sqrt(1 - epsilon ** 2)
+        else:
+            return SU2SingleMatrix()
 
-        r = np.random.random((3)) - 0.5
-        x = epsilon * r / np.linalg.norm(r)
+    if kind == 2:
+        return sample_HB_SU2(Wsub, beta)
 
-        rmatrix = x0 * np.identity(2) + 1j * x[0] * sx + 1j * x[1] * sy + 1j * x[2] * sz
 
-        return rmatrix
+@njit()
+def GS(A):
+
+    """Gram Schmidt orthogolanization. It's not necessary"""
+
+    if len(A[0]) == 3:
+
+        u = np.array((A[0, 0], A[0, 1], A[0, 2]))
+        v = np.array((A[1, 0], A[1, 1], A[1, 2]))
+
+        u = normalize(u)
+        v -= u * u.dot(v)
+        v = normalize(v)
+        v -= u * u.dot(v)
+        v = normalize(v)
+        uxv = np.cross(u, v)
+        uxv = normalize(uxv)
+
+        A[0] = u
+        A[1] = v
+        A[2] = uxv
+
+    if len(A[0]) == 2:
+        u = np.array((A[0, 0], A[0, 1]))
+        v = np.array((A[1, 0], A[1, 1]))
+
+        u = normalize(u)
+        v -= u * u.dot(v)
+        v = normalize(v)
+        v -= u * u.dot(v)
+        v = normalize(v)
+
+        A[0] = u
+        A[1] = v
+
+    return A
 
 
 @njit()
@@ -296,9 +331,9 @@ def calculate_S(link, stapla, beta):
 
 
 @njit()
-def Metropolis(U, beta, sweeps):
+def Metropolis(U, beta, hits):
 
-    """Execution of Metropolis, checking every single site 10 times. Non funziona bene ancora!"""
+    """Execution of Metropolis, checking every single site 10 times."""
 
     for t in range(N):
         for x in range(N):
@@ -308,7 +343,7 @@ def Metropolis(U, beta, sweeps):
 
                         staple = staple_calculus(t, x, y, z, mu, U)
 
-                        for _ in range(sweeps):
+                        for _ in range(hits):
 
                             old_link = U[t, x, y, z, mu].copy()
                             S_old = calculate_S(old_link, staple, beta)
@@ -340,18 +375,22 @@ if __name__ == "__main__":
 
     import time
 
-    measures = par.measures
+    measures = 40
     idecorrel = par.idecorrel
 
     R = 1
     T = 1
-    beta_vec = (np.linspace(0.1, 8, 100)).tolist()
+    beta_vec = (np.linspace(0.1, 8, 50)).tolist()
     U = initialize_lattice(1, N)
+
+    s = SU3SingleMatrix()
+
+    print(np.trace(s), np.linalg.det(s))
 
     # which kind of link update would you like to use?
     overrelax = False
-    metropolis = True
-    heatbath = False
+    metropolis = False
+    heatbath = True
 
     Smean = []
     Smean2 = []
@@ -363,7 +402,14 @@ if __name__ == "__main__":
 
     for beth in beta_vec:
 
-        print("exe for beta = ", round(beth, 2), "step", beta_vec.index(beth))
+        print(
+            "exe for beta = ",
+            round(beth, 2),
+            "step",
+            beta_vec.index(beth),
+            "/",
+            len(beta_vec),
+        )
         obs = []
         obsame = []
 
@@ -373,7 +419,7 @@ if __name__ == "__main__":
                 U = HB_updating_links(beth, U, N)
 
             if metropolis:
-                U = Metropolis(U, beth, sweeps=10)
+                U = Metropolis(U, beth, hits=10)
 
             if overrelax:
                 for _ in range(idecorrel):
