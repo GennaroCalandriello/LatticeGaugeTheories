@@ -186,9 +186,6 @@ def heatbath_SU3(W, beta, subgrp, kind=1):
         else:
             return SU2SingleMatrix()
 
-    if kind == 2:
-        return sample_HB_SU2(Wsub, beta)
-
 
 @njit()
 def GS(A):
