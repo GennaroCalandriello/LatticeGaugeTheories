@@ -24,7 +24,7 @@ epsilon = 0.2
 xi = 1 - epsilon
 
 
-#@njit()
+# @njit()
 def SU2SingleMatrix():
 
     r0 = np.random.uniform(-0.5, 0.5)
@@ -61,7 +61,7 @@ def initialize_fields(start):
     return U, UHiggs
 
 
-#@njit()
+# @njit()
 def Higgs_staple_calculus(t, x, y, z, mu, U, phi):
 
     """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
@@ -148,7 +148,7 @@ def Higgs_staple_calculus(t, x, y, z, mu, U, phi):
     return HiggsCoupled
 
 
-#@njit()
+# @njit()
 def Updating_Higgs(U, phi, beta):
 
     for t in range(N):
@@ -158,8 +158,10 @@ def Updating_Higgs(U, phi, beta):
                     for mu in range(4):
                         phi[t, x, y, z, mu] = HB_Higgs(t, x, y, z, mu, U, phi)
 
+    return phi
 
-#@njit()
+
+# @njit()
 def Updating_gauge_configuration(U, phi, beta):
 
     for t in range(N):
@@ -172,9 +174,13 @@ def Updating_gauge_configuration(U, phi, beta):
 
                         U[t, x, y, z, mu] = HB_gauge(HiggsStaple, beta)
 
+    return U
 
-#@njit()
+
+# @njit()
 def HB_Higgs(t, x, y, z, mu, U, phi):
+
+    """Non so se questo algoritmo è corretto"""
 
     V = generateV(t, x, y, z, mu, U, phi)
 
@@ -182,30 +188,36 @@ def HB_Higgs(t, x, y, z, mu, U, phi):
     phi = z.copy()
 
     for i in range(len(z)):
-        z[i] = rand(np.random.uniform(0, 1))
+
+        z[i] = rand(np.random.uniform(0, 1), np.random.uniform(0, 1))
 
     for j in range(len(z)):
+
         phi[j] = z[j] - V[j] / xi
 
-    return np.array(
+    phiupdated = np.array(
         (
             (phi[0] + 1j * phi[3], phi[2] + 1j * phi[1]),
             (-phi[2] + 1j * phi[1], phi[0] - 1j * phi[3]),
         )
     )
+    print(np.linalg.det(phiupdated))
+
+    return phiupdated
 
 
-#@njit()
+# @njit()
 def rand(x1, x2):
 
     return np.sqrt(-np.log(x1) / xi) * np.cos(np.pi * 2 * x2)
 
 
-#@njit()
+# @njit()
 def generateV(t, x, y, z, mu, U, phi):
 
     """equation 3.36"""
-    Vtemp = 0
+    Vtemp = np.array(((0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j)))
+
     for nu in range(4):
 
         a_nu = [0, 0, 0, 0]
@@ -248,7 +260,7 @@ def generateV(t, x, y, z, mu, U, phi):
     return np.array((V0, V1, V2, V3))
 
 
-#@njit()
+# @njit()
 def HB_gauge(staple, beta):
 
     w = normalize(getA(staple))
@@ -266,13 +278,13 @@ def HB_gauge(staple, beta):
         return SU2SingleMatrix()
 
 
-#@njit()
+# @njit()
 def normalize(v):
 
     return v / np.sqrt(v.dot(v))
 
 
-#@njit()
+# @njit()
 def WilsonAction(R, T, U):
 
     """Name says"""
@@ -358,20 +370,26 @@ def WilsonAction(R, T, U):
     return somma / (6 * N ** 4)
 
 
-#@njit()
+def prova(phi):
+
+    print(np.trace(phi[0, 0, 0, 0, 0].conj().T @ phi[0, 0, 0, 0, 0]))
+
+
+# @njit()
 def completeHiggsAction(R, T, U, phi):
 
     Wilson = WilsonAction(R, T, U)
     somma = 0
+    phi1, phi2, phi3 = 0, 0, 0
 
     for t in range(N):
         for x in range(N):
             for y in range(N):
                 for z in range(N):
 
-                    phi1 = np.identity(su2) + 0j
-                    phi2 = phi1.copy()
-                    phi3 = phi3.copy()
+                    # phi1 = np.identity(su2) + 0j
+                    # phi2 = phi1.copy()
+                    # phi3 = phi1.copy()
 
                     for mu in range(4):
 
@@ -407,9 +425,10 @@ def completeHiggsAction(R, T, U, phi):
                                     (x + a_nu[1]) % N,
                                     (y + a_nu[2]) % N,
                                     (z + a_nu[3]) % N,
-                                    mu,
+                                    nu,
                                 ]
                             )
+                        # print("phi1=", phi1, "phi2=", phi2, "phi3=", phi3)
 
     return phi1 + phi2 + phi3 + Wilson
 
@@ -417,12 +436,15 @@ def completeHiggsAction(R, T, U, phi):
 if __name__ == "__main__":
 
     U, phi = initialize_fields(1)
+
     measures = 10
     R, T = 1, 1
 
     betavec = np.linspace(0.1, 8.0, 10).tolist()
 
     results = []
+
+    # print(np.trace(phi[0, 0, 0, 0, 0].conj().T @ U[0, 0, 0, 0, 0] @ phi[0, 0, 0, 0, 0]))
 
     for b in betavec:
         print("exe for beta: ", b)
@@ -433,9 +455,10 @@ if __name__ == "__main__":
 
             U = Updating_gauge_configuration(U, phi, b)
             phi = Updating_Higgs(U, phi, b)
+
             temp = completeHiggsAction(R, T, U, phi)
-            print(temp)
-            obs.append(temp)
+            # print(temp)
+            # obs.append(temp)
 
         results.append(np.mean(obs))
 
