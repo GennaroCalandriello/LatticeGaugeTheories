@@ -10,6 +10,6 @@ Heat-Bath + 2 Over-relaxation for each measure
 Metropolis (N_hits=10)
 ![su2metrohits50](https://user-images.githubusercontent.com/91687268/213728370-2a07dc4c-5bf7-4084-b966-e8d313e43138.png)
 
-This is the first result of Higgs coupling with SU(2), with a comparison:
+This is the first result of Higgs coupling with SU(2), with a comparison (N=7, only heath bath, $\beta$ = 2.2):
 ![su2 secondo risultato N = 7](https://user-images.githubusercontent.com/91687268/213894384-0305dd98-3623-45bc-b08b-945a5b9118c3.png)
 ![su2gaugehiggsvaryingk](https://user-images.githubusercontent.com/91687268/213894392-91c8e736-8851-497c-a0a0-bf11cd8bfca2.png)
