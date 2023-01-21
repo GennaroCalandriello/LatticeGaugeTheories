@@ -6,7 +6,7 @@ import numpy.random as ran
 from functions import *
 
 su2 = 2
-N = 5
+N = 7
 
 """This code refers to the thesis entitled: Lattice Simulation of SU(2) Multi Higgs fields"""
 
@@ -53,7 +53,7 @@ def initialize_fields(start):
                     for mu in range(4):
 
                         s = SU2SingleMatrix()
-                        UHiggs[t, x, y, z, mu] = HiggsMatrixGen(s)
+                        UHiggs[t, x, y, z, mu] = s
 
                         if start == 0:
                             U[t, x, y, z, mu] = np.identity(su2)
@@ -162,7 +162,7 @@ def Updating_Higgs(U, phi, beta, k):
                     for mu in range(4):
                         s = HB_Higgs(t, x, y, z, mu, U, phi, k)
                         # print(np.linalg.det(s))
-                        phi[t, x, y, z, mu] = HiggsMatrixGen(s)
+                        phi[t, x, y, z, mu] = s
 
     return phi
 
@@ -469,7 +469,7 @@ def completeHiggsAction(R, T, U, phi, k):
         for x in range(N):
             for y in range(N):
                 for z in range(N):
-                    for mu in range(4):
+                    for mu in range(1, 4):
 
                         if kind == 1:
 
@@ -510,22 +510,26 @@ def completeHiggsAction(R, T, U, phi, k):
                             nu = mu
                             a_nu = [0, 0, 0, 0]
                             a_nu[nu] = 1
-                            phi3 += -k * np.trace(
-                                phi[t, x, y, z, nu].conj().T
-                                @ U[
-                                    (t + a_nu[0]) % N,
-                                    (x + a_nu[1]) % N,
-                                    (y + a_nu[2]) % N,
-                                    (z + a_nu[3]) % N,
-                                    nu,
-                                ]
-                                @ phi[
-                                    (t + a_nu[0]) % N,
-                                    (x + a_nu[1]) % N,
-                                    (y + a_nu[2]) % N,
-                                    (z + a_nu[3]) % N,
-                                    nu,
-                                ]
+                            phi3 += (
+                                -k
+                                * 0.5
+                                * np.trace(
+                                    phi[t, x, y, z, nu].conj().T
+                                    @ U[
+                                        (t + a_nu[0]) % N,
+                                        (x + a_nu[1]) % N,
+                                        (y + a_nu[2]) % N,
+                                        (z + a_nu[3]) % N,
+                                        nu,
+                                    ]
+                                    @ phi[
+                                        (t + a_nu[0]) % N,
+                                        (x + a_nu[1]) % N,
+                                        (y + a_nu[2]) % N,
+                                        (z + a_nu[3]) % N,
+                                        nu,
+                                    ]
+                                )
                             )
 
     # return (phi1 + phi2 + phi3) / (6 * N ** 4) + beta * (1 - Wilson)
@@ -534,13 +538,17 @@ def completeHiggsAction(R, T, U, phi, k):
 
 if __name__ == "__main__":
 
+    import time
+
+    start = time.time()
+
     U, phi = initialize_fields(1)
 
-    measures = 10
+    measures = 20
     R, T = 1, 1
 
-    betavec = np.linspace(0.1, 15.0, 20).tolist()
-    kvec = np.linspace(0.3, 0.8, 20)
+    # betavec = np.linspace(0.1, 15.0, 35).tolist()
+    kvec = np.linspace(0.4, 1.4, 55).tolist()
 
     beta = 2.2
 
@@ -549,7 +557,8 @@ if __name__ == "__main__":
     # print(np.trace(phi[0, 0, 0, 0, 0].conj().T @ U[0, 0, 0, 0, 0] @ phi[0, 0, 0, 0, 0]))
 
     for k in kvec:
-        print("exe for k = ", k)
+
+        print(f"exe for k = {k}, remaining {len(kvec)-kvec.index(k)}")
 
         obs = []
 
@@ -565,6 +574,12 @@ if __name__ == "__main__":
         results.append(np.mean(obs).real)
         print("mean", np.mean(obs))
 
-plt.figure()
-plt.plot(kvec, results, "go")
-plt.show()
+    print(f"Execution time: {round(time.time() - start, 2)} secondisegniòç")
+
+    plt.figure()
+    plt.title("SU(2)-Higgs coupling, Heat Bath", fontsize=23)
+    plt.xlabel("k", fontsize=16)
+    plt.ylabel(r"<$S_{SU2}$+$S_{Higgs}$>", fontsize=20)
+    plt.legend()
+    plt.plot(kvec, results, "go")
+    plt.show()

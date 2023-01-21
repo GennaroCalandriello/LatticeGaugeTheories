@@ -76,8 +76,3 @@ def quaternion(vec):
 @njit()
 def normalize(v):
     return v / np.sqrt(v.dot(v))
-
-@njit()
-def HiggsMatrixGen(s):
-
-    return sy@s.T@sy
