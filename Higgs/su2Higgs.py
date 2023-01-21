@@ -1,11 +1,12 @@
 import numpy as np
 from numba import njit
 import matplotlib.pyplot as plt
+import numpy.random as ran
 
 from functions import *
 
 su2 = 2
-N = 6
+N = 5
 
 """This code refers to the thesis entitled: Lattice Simulation of SU(2) Multi Higgs fields"""
 
@@ -13,18 +14,18 @@ N = 6
 sx = np.array(((0, 1), (1, 0)), complex)
 sy = np.array(((0, -1j), (1j, 0)), complex)
 sz = np.array(((1, 0), (0, -1)), complex)
-s0 = np.identity(su2)
+s0 = np.identity(su2) + 0j
 
 
 # Higgs parameters to controll and calibrate
 
-Lambda = 0.1
-k = 0.1
+Lambda = 0.001
+# k = 0.2
 epsilon = 0.2
-xi = 1 - epsilon
+xi = 1.08  # 1 - epsilon
 
 
-# @njit()
+@njit()
 def SU2SingleMatrix():
 
     r0 = np.random.uniform(-0.5, 0.5)
@@ -51,7 +52,8 @@ def initialize_fields(start):
                 for z in range(N):
                     for mu in range(4):
 
-                        UHiggs[t, x, y, z, mu] = SU2SingleMatrix()
+                        s = SU2SingleMatrix()
+                        UHiggs[t, x, y, z, mu] = HiggsMatrixGen(s)
 
                         if start == 0:
                             U[t, x, y, z, mu] = np.identity(su2)
@@ -61,8 +63,8 @@ def initialize_fields(start):
     return U, UHiggs
 
 
-# @njit()
-def Higgs_staple_calculus(t, x, y, z, mu, U, phi):
+@njit()
+def Higgs_staple_calculus(t, x, y, z, mu, U, phi, k, beta):
 
     """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
     # staple_start = np.zeros((su3, su3), complex)
@@ -144,25 +146,29 @@ def Higgs_staple_calculus(t, x, y, z, mu, U, phi):
         ]
         @ phi[t, x, y, z, mu].conj().T
     )
+    # print("staple", np.linalg.det(staple_start))
+    # print("higgsstaple", HiggsCoupled - beta * staple_start)
 
     return HiggsCoupled
 
 
-# @njit()
-def Updating_Higgs(U, phi, beta):
+@njit()
+def Updating_Higgs(U, phi, beta, k):
 
     for t in range(N):
         for x in range(N):
             for y in range(N):
                 for z in range(N):
                     for mu in range(4):
-                        phi[t, x, y, z, mu] = HB_Higgs(t, x, y, z, mu, U, phi)
+                        s = HB_Higgs(t, x, y, z, mu, U, phi, k)
+                        # print(np.linalg.det(s))
+                        phi[t, x, y, z, mu] = HiggsMatrixGen(s)
 
     return phi
 
 
-# @njit()
-def Updating_gauge_configuration(U, phi, beta):
+@njit()
+def Updating_gauge_configuration(U, phi, beta, k):
 
     for t in range(N):
         for x in range(N):
@@ -170,60 +176,29 @@ def Updating_gauge_configuration(U, phi, beta):
                 for z in range(N):
                     for mu in range(4):
 
-                        HiggsStaple = Higgs_staple_calculus(t, x, y, z, mu, U, phi)
-
-                        U[t, x, y, z, mu] = HB_gauge(HiggsStaple, beta)
+                        HiggsStaple = Higgs_staple_calculus(
+                            t, x, y, z, mu, U, phi, k, beta
+                        )
+                        Unew = HB_gauge(HiggsStaple, beta)
+                        U[t, x, y, z, mu] = Unew
 
     return U
 
 
-# @njit()
-def HB_Higgs(t, x, y, z, mu, U, phi):
+@njit()
+def HB_Higgs(t, x, y, z, mu, U, phi, k):
 
-    """Non so se questo algoritmo è corretto"""
-
-    V = generateV(t, x, y, z, mu, U, phi)
-
-    z = np.array((0 + 0j, 0 + 0j, 0 + 0j, 0 + 0j))
-    phi = z.copy()
-
-    for i in range(len(z)):
-
-        z[i] = rand(np.random.uniform(0, 1), np.random.uniform(0, 1))
-
-    for j in range(len(z)):
-
-        phi[j] = z[j] - V[j] / xi
-
-    phiupdated = np.array(
-        (
-            (phi[0] + 1j * phi[3], phi[2] + 1j * phi[1]),
-            (-phi[2] + 1j * phi[1], phi[0] - 1j * phi[3]),
-        )
-    )
-    print(np.linalg.det(phiupdated))
-
-    return phiupdated
-
-
-# @njit()
-def rand(x1, x2):
-
-    return np.sqrt(-np.log(x1) / xi) * np.cos(np.pi * 2 * x2)
-
-
-# @njit()
-def generateV(t, x, y, z, mu, U, phi):
-
-    """equation 3.36"""
-    Vtemp = np.array(((0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j)))
+    V0 = 0 + 0j
+    V1 = V0
+    V2 = V0
+    V3 = V0
 
     for nu in range(4):
 
         a_nu = [0, 0, 0, 0]
         a_nu[nu] = 1
 
-        Vtemp += (
+        V0 += np.trace(
             phi[
                 (t + a_nu[0]) % N,
                 (x + a_nu[1]) % N,
@@ -233,17 +208,17 @@ def generateV(t, x, y, z, mu, U, phi):
             ]
             .conj()
             .T
-            @ U[t, x, y, z, nu].conj().T
-            + phi[
+            @ U[t, x, y, z, nu]
+            @ s0
+            + s0
+            @ U[
                 (t - a_nu[0]) % N,
                 (x - a_nu[1]) % N,
                 (y - a_nu[2]) % N,
                 (z - a_nu[3]) % N,
                 nu,
             ]
-            .conj()
-            .T
-            @ U[
+            @ phi[
                 (t - a_nu[0]) % N,
                 (x - a_nu[1]) % N,
                 (y - a_nu[2]) % N,
@@ -252,15 +227,119 @@ def generateV(t, x, y, z, mu, U, phi):
             ]
         )
 
-    V0 = (k / 2) * np.trace(s0 @ Vtemp)
-    V1 = (k / 2) * np.trace(sx @ Vtemp)
-    V2 = (k / 2) * np.trace(sy @ Vtemp)
-    V3 = (k / 2) * np.trace(sz @ Vtemp)
+        V1 += np.trace(
+            phi[
+                (t + a_nu[0]) % N,
+                (x + a_nu[1]) % N,
+                (y + a_nu[2]) % N,
+                (z + a_nu[3]) % N,
+                nu,
+            ]
+            .conj()
+            .T
+            @ U[t, x, y, z, nu]
+            @ sx
+            + sx
+            @ U[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+            @ phi[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+        )
 
-    return np.array((V0, V1, V2, V3))
+        V2 += np.trace(
+            phi[
+                (t + a_nu[0]) % N,
+                (x + a_nu[1]) % N,
+                (y + a_nu[2]) % N,
+                (z + a_nu[3]) % N,
+                nu,
+            ]
+            .conj()
+            .T
+            @ U[t, x, y, z, nu]
+            @ sy
+            + sy
+            @ U[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+            @ phi[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+        )
+
+        V3 += np.trace(
+            phi[
+                (t + a_nu[0]) % N,
+                (x + a_nu[1]) % N,
+                (y + a_nu[2]) % N,
+                (z + a_nu[3]) % N,
+                nu,
+            ]
+            .conj()
+            .T
+            @ U[t, x, y, z, nu]
+            @ sz
+            + sz
+            @ U[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+            @ phi[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+        )
+    phi0 = V0 * (1j * k / 2) + np.sqrt(-(1 / xi) * np.log(ran.uniform(0, 1))) * np.sin(
+        2 * np.pi * ran.uniform(0, 1)
+    )
+    phi1 = V1 * (1j * k / 2) + np.sqrt(-(1 / xi) * np.log(ran.uniform(0, 1))) * np.sin(
+        2 * np.pi * ran.uniform(0, 1)
+    )
+    phi2 = V2 * (1j * k / 2) + np.sqrt(-(1 / xi) * np.log(ran.uniform(0, 1))) * np.sin(
+        2 * np.pi * ran.uniform(0, 1)
+    )
+    phi3 = V3 * (1j * k / 2) + np.sqrt(-(1 / xi) * np.log(ran.uniform(0, 1))) * np.sin(
+        2 * np.pi * ran.uniform(0, 1)
+    )
+
+    phivec = np.array((phi0, phi1, phi2, phi3))
+    phivec = normalize(phivec)
+
+    phinew = np.array(
+        (
+            (phivec[0] + 1j * phivec[3], phivec[2] + 1j * phivec[1]),
+            (-phivec[2] + 1j * phivec[1], phivec[0] - 1j * phivec[3]),
+        )
+    )
+
+    return phinew
 
 
-# @njit()
+@njit()
 def HB_gauge(staple, beta):
 
     w = normalize(getA(staple))
@@ -270,7 +349,7 @@ def HB_gauge(staple, beta):
     if a != 0:
         xw = quaternion(sampleA(beta, a))
 
-        xx = xw @ wbar.conj().T  ###!!!!warning!!!
+        xx = xw @ wbar.conj().T
 
         return xx
 
@@ -278,13 +357,13 @@ def HB_gauge(staple, beta):
         return SU2SingleMatrix()
 
 
-# @njit()
+@njit()
 def normalize(v):
 
     return v / np.sqrt(v.dot(v))
 
 
-# @njit()
+@njit()
 def WilsonAction(R, T, U):
 
     """Name says"""
@@ -375,51 +454,71 @@ def prova(phi):
     print(np.trace(phi[0, 0, 0, 0, 0].conj().T @ phi[0, 0, 0, 0, 0]))
 
 
-# @njit()
-def completeHiggsAction(R, T, U, phi):
+@njit()
+def completeHiggsAction(R, T, U, phi, k):
 
     Wilson = WilsonAction(R, T, U)
-    somma = 0
-    phi1, phi2, phi3 = 0, 0, 0
+
+    kind = 2  # minimal action coupling with higgs
+
+    phi1 = 0
+    phi2 = 0
+    phi3 = 0
 
     for t in range(N):
         for x in range(N):
             for y in range(N):
                 for z in range(N):
-
-                    # phi1 = np.identity(su2) + 0j
-                    # phi2 = phi1.copy()
-                    # phi3 = phi1.copy()
-
                     for mu in range(4):
 
-                        a_mu = [0, 0, 0, 0]
-                        a_mu[mu] = 1
+                        if kind == 1:
 
-                        phi1 += (
-                            Lambda
-                            * (
-                                (1 / 2)
-                                * np.trace(
-                                    phi[t, x, y, z, mu].conj().T @ phi[t, x, y, z, mu]
-                                )
-                                - 1
+                            phi1 += 0.5 * np.trace(
+                                phi[t, x, y, z, mu].conj().T @ phi[t, x, y, z, mu]
                             )
-                            ** 2
-                        )
+                            phi2 += (
+                                Lambda
+                                * (
+                                    0.5
+                                    * np.trace(
+                                        phi[t, x, y, z, mu].conj().T
+                                        @ phi[t, x, y, z, mu]
+                                    )
+                                    - 1
+                                )
+                                ** 2
+                            )
 
-                        phi2 += 0.5 * np.trace(
-                            phi[t, x, y, z, mu].conj().T @ phi[t, x, y, z, mu]
-                        )
+                            for nu in range(4):
+                                a_nu = [0, 0, 0, 0]
+                                a_nu[nu] = 1
+                                phi3 += -k * np.trace(
+                                    phi[
+                                        (t + a_nu[0]) % N,
+                                        (x + a_nu[1]) % N,
+                                        (y + a_nu[2]) % N,
+                                        (z + a_nu[3]) % N,
+                                        nu,
+                                    ]
+                                    .conj()
+                                    .T
+                                    @ U[t, x, y, z, nu]
+                                    @ phi[t, x, y, z, nu]
+                                )
 
-                        for nu in range(4):
-
+                        if kind == 2:
+                            nu = mu
                             a_nu = [0, 0, 0, 0]
                             a_nu[nu] = 1
-
                             phi3 += -k * np.trace(
                                 phi[t, x, y, z, nu].conj().T
-                                @ U[t, x, y, z, nu]
+                                @ U[
+                                    (t + a_nu[0]) % N,
+                                    (x + a_nu[1]) % N,
+                                    (y + a_nu[2]) % N,
+                                    (z + a_nu[3]) % N,
+                                    nu,
+                                ]
                                 @ phi[
                                     (t + a_nu[0]) % N,
                                     (x + a_nu[1]) % N,
@@ -428,9 +527,9 @@ def completeHiggsAction(R, T, U, phi):
                                     nu,
                                 ]
                             )
-                        # print("phi1=", phi1, "phi2=", phi2, "phi3=", phi3)
 
-    return phi1 + phi2 + phi3 + Wilson
+    # return (phi1 + phi2 + phi3) / (6 * N ** 4) + beta * (1 - Wilson)
+    return phi3 / N ** 4 + Wilson
 
 
 if __name__ == "__main__":
@@ -440,25 +539,32 @@ if __name__ == "__main__":
     measures = 10
     R, T = 1, 1
 
-    betavec = np.linspace(0.1, 8.0, 10).tolist()
+    betavec = np.linspace(0.1, 15.0, 20).tolist()
+    kvec = np.linspace(0.3, 0.8, 20)
+
+    beta = 2.2
 
     results = []
 
     # print(np.trace(phi[0, 0, 0, 0, 0].conj().T @ U[0, 0, 0, 0, 0] @ phi[0, 0, 0, 0, 0]))
 
-    for b in betavec:
-        print("exe for beta: ", b)
+    for k in kvec:
+        print("exe for k = ", k)
 
         obs = []
 
         for i in range(measures):
 
-            U = Updating_gauge_configuration(U, phi, b)
-            phi = Updating_Higgs(U, phi, b)
+            U = Updating_gauge_configuration(U, phi, beta, k)
+            phi = Updating_Higgs(U, phi, beta, k)
 
-            temp = completeHiggsAction(R, T, U, phi)
-            # print(temp)
-            # obs.append(temp)
+            temp = completeHiggsAction(R, T, U, phi, k)
+            print(temp)
+            obs.append(temp)
 
-        results.append(np.mean(obs))
+        results.append(np.mean(obs).real)
+        print("mean", np.mean(obs))
 
+plt.figure()
+plt.plot(kvec, results, "go")
+plt.show()

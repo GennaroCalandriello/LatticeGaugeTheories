@@ -1,7 +1,14 @@
 import numpy as np
 from numba import njit
 
-# @njit()
+su2=2
+
+sx = np.array(((0, 1), (1, 0)), complex)
+sy = np.array(((0, -1j), (1j, 0)), complex)
+sz = np.array(((1, 0), (0, -1)), complex)
+s0 = np.identity(su2)
+
+@njit()
 def getA(W):
 
     """Construct the vector needed for the quaternion"""
@@ -16,7 +23,7 @@ def getA(W):
     return Avector
 
 
-# @njit()
+@njit()
 def sampleA(a, beta):
 
     """choose a0 with P(a0) ~ sqrt(1 - a0^2) * exp(beta * k * a0)"""
@@ -51,7 +58,7 @@ def sampleA(a, beta):
     return avec
 
 
-# @njit()
+@njit()
 def quaternion(vec):
 
     """produces quaternion from a vector of complex and real numbers"""
@@ -66,7 +73,11 @@ def quaternion(vec):
     return quat
 
 
-# @njit()
+@njit()
 def normalize(v):
     return v / np.sqrt(v.dot(v))
 
+@njit()
+def HiggsMatrixGen(s):
+
+    return sy@s.T@sy
