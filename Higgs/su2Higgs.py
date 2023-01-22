@@ -6,7 +6,7 @@ import numpy.random as ran
 from functions import *
 
 su2 = 2
-N = 7
+N = 6
 
 """This code refers to the thesis entitled: Lattice Simulation of SU(2) Multi Higgs fields"""
 
@@ -19,7 +19,7 @@ s0 = np.identity(su2) + 0j
 
 # Higgs parameters to controll and calibrate
 
-Lambda = 0.001
+Lambda = 0.0005
 # k = 0.2
 epsilon = 0.2
 xi = 1.08  # 1 - epsilon
@@ -471,57 +471,76 @@ def completeHiggsAction(R, T, U, phi, k):
                 for z in range(N):
                     for mu in range(1, 4):
 
-                        if kind == 1:
-
-                            phi1 += 0.5 * np.trace(
-                                phi[t, x, y, z, mu].conj().T @ phi[t, x, y, z, mu]
+                        nu = mu
+                        a_nu = [0, 0, 0, 0]
+                        a_nu[nu] = 1
+                        phi3 += (
+                            -k
+                            * 0.5
+                            * np.trace(
+                                phi[t, x, y, z, nu].conj().T
+                                @ U[
+                                    (t + a_nu[0]) % N,
+                                    (x + a_nu[1]) % N,
+                                    (y + a_nu[2]) % N,
+                                    (z + a_nu[3]) % N,
+                                    nu,
+                                ]
+                                @ phi[
+                                    (t + a_nu[0]) % N,
+                                    (x + a_nu[1]) % N,
+                                    (y + a_nu[2]) % N,
+                                    (z + a_nu[3]) % N,
+                                    nu,
+                                ]
                             )
-                            phi2 += (
-                                Lambda
-                                * (
-                                    0.5
-                                    * np.trace(
-                                        phi[t, x, y, z, mu].conj().T
-                                        @ phi[t, x, y, z, mu]
-                                    )
-                                    - 1
+                        )
+
+    # return (phi1 + phi2 + phi3) / (6 * N ** 4) + beta * (1 - Wilson)
+    return phi3 / (4 * N ** 4) + Wilson
+
+
+@njit()
+def extendedHiggsAction(R, T, U, phi, k):
+
+    Wilson = WilsonAction(R, T, U)
+
+    kind = 2  # minimal action coupling with higgs
+
+    phi1 = 0
+    phi2 = 0
+    phi3 = 0
+
+    for t in range(N):
+        for x in range(N):
+            for y in range(N):
+                for z in range(N):
+                    for mu in range(1, 4):
+
+                        phi1 += 0.5 * np.trace(
+                            phi[t, x, y, z, mu].conj().T @ phi[t, x, y, z, mu]
+                        )
+                        phi2 += (
+                            Lambda
+                            * (
+                                0.5
+                                * np.trace(
+                                    phi[t, x, y, z, mu].conj().T @ phi[t, x, y, z, mu]
                                 )
-                                ** 2
+                                - 1
                             )
+                            ** 2
+                        )
 
-                            for nu in range(4):
-                                a_nu = [0, 0, 0, 0]
-                                a_nu[nu] = 1
-                                phi3 += -k * np.trace(
-                                    phi[
-                                        (t + a_nu[0]) % N,
-                                        (x + a_nu[1]) % N,
-                                        (y + a_nu[2]) % N,
-                                        (z + a_nu[3]) % N,
-                                        nu,
-                                    ]
-                                    .conj()
-                                    .T
-                                    @ U[t, x, y, z, nu]
-                                    @ phi[t, x, y, z, nu]
-                                )
-
-                        if kind == 2:
-                            nu = mu
+                        for nu in range(4):
                             a_nu = [0, 0, 0, 0]
                             a_nu[nu] = 1
                             phi3 += (
                                 -k
-                                * 0.5
+                                * 2
                                 * np.trace(
                                     phi[t, x, y, z, nu].conj().T
-                                    @ U[
-                                        (t + a_nu[0]) % N,
-                                        (x + a_nu[1]) % N,
-                                        (y + a_nu[2]) % N,
-                                        (z + a_nu[3]) % N,
-                                        nu,
-                                    ]
+                                    @ U[t, x, y, z, nu]
                                     @ phi[
                                         (t + a_nu[0]) % N,
                                         (x + a_nu[1]) % N,
@@ -531,9 +550,82 @@ def completeHiggsAction(R, T, U, phi, k):
                                     ]
                                 )
                             )
+    return (phi2) / (4 * N ** 4)
 
-    # return (phi1 + phi2 + phi3) / (6 * N ** 4) + beta * (1 - Wilson)
-    return phi3 / N ** 4 + Wilson
+
+def main(par, measures, beta, k, R, T):
+
+    """par specify which parameter do you want to vary during sim., k (per beta che varia), beta (per k che varia), R e T estensione del Wilson loop"""
+
+    U, phi = initialize_fields(1)
+
+    betavec = np.linspace(0.1, 8.0, 25).tolist()
+    kvec = np.linspace(0.1, 1.4, 25).tolist()
+    results = []
+
+    if par == "beta":
+
+        beta = 0
+
+        for beta in betavec:
+
+            print(
+                f"exe for beta = {beta}, remaining {len(betavec)-betavec.index(beta)}"
+            )
+
+            obs = []
+
+            for i in range(measures):
+
+                U = Updating_gauge_configuration(U, phi, beta, k)
+                phi = Updating_Higgs(U, phi, beta, k)
+
+                temp = completeHiggsAction(R, T, U, phi, k)
+                print(temp)
+                obs.append(temp)
+
+            results.append(np.mean(obs).real)
+            print("mean", np.mean(obs))
+
+        plt.figure()
+        plt.title("SU(2)-Higgs coupling, Heat Bath", fontsize=23)
+        plt.xlabel(r"$\beta$", fontsize=16)
+        plt.ylabel(r"<$S_{SU2}$+$S_{Higgs}$>", fontsize=20)
+        plt.legend([r"$\beta$ = {0.8}"])
+        plt.plot(betavec, results, "go")
+        plt.show()
+
+    if par == "k":
+
+        k = 0.0
+
+        for k in kvec:
+
+            print(f"exe for k = {k}, remaining {len(kvec)-kvec.index(k)}")
+
+            obs = []
+
+            for i in range(measures):
+
+                U = Updating_gauge_configuration(U, phi, beta, k)
+                phi = Updating_Higgs(U, phi, beta, k)
+
+                temp = completeHiggsAction(R, T, U, phi, k)
+                # temp = extendedHiggsAction(R, T, U, phi, k)
+                print(round(temp.real, 4))
+                print("imaginary part:", round(temp.imag, 4))
+                obs.append(temp)
+
+            results.append(np.mean(obs).real)
+            print("mean", np.mean(obs))
+
+        plt.figure()
+        plt.title("SU(2)-Higgs coupling, Heat Bath", fontsize=23)
+        plt.xlabel(r"k", fontsize=16)
+        plt.ylabel(r"<$S_{SU2}$+$S_{Higgs}$>", fontsize=20)
+        plt.legend([f"beta = {beta}"])
+        plt.plot(kvec, results, "go")
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -542,44 +634,7 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    U, phi = initialize_fields(1)
-
-    measures = 20
-    R, T = 1, 1
-
-    # betavec = np.linspace(0.1, 15.0, 35).tolist()
-    kvec = np.linspace(0.4, 1.4, 55).tolist()
-
-    beta = 2.2
-
-    results = []
-
-    # print(np.trace(phi[0, 0, 0, 0, 0].conj().T @ U[0, 0, 0, 0, 0] @ phi[0, 0, 0, 0, 0]))
-
-    for k in kvec:
-
-        print(f"exe for k = {k}, remaining {len(kvec)-kvec.index(k)}")
-
-        obs = []
-
-        for i in range(measures):
-
-            U = Updating_gauge_configuration(U, phi, beta, k)
-            phi = Updating_Higgs(U, phi, beta, k)
-
-            temp = completeHiggsAction(R, T, U, phi, k)
-            print(temp)
-            obs.append(temp)
-
-        results.append(np.mean(obs).real)
-        print("mean", np.mean(obs))
+    main("k", 20, 2.2, 0, 1, 1)
 
     print(f"Execution time: {round(time.time() - start, 2)} secondisegniòç")
 
-    plt.figure()
-    plt.title("SU(2)-Higgs coupling, Heat Bath", fontsize=23)
-    plt.xlabel("k", fontsize=16)
-    plt.ylabel(r"<$S_{SU2}$+$S_{Higgs}$>", fontsize=20)
-    plt.legend()
-    plt.plot(kvec, results, "go")
-    plt.show()
