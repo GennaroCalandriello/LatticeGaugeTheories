@@ -8,7 +8,12 @@ from functions import *
 su2 = 2
 N = 6
 
-"""This code refers to the thesis entitled: Lattice Simulation of SU(2) Multi Higgs fields"""
+"""This code refers to the works: 
+
+1. "Numerical Simulations of
+    Gauge-Higgs Models on the Lattice", of Jochen Heitger, 1997
+2. "Lattice Simulation of SU(2) Multi Higgs fields", Mark B. Wurtz
+3. "On the phase diagram of the Higgs SU(2) model", C. Bonati, M. D'Elia"""
 
 
 sx = np.array(((0, 1), (1, 0)), complex)
@@ -17,7 +22,7 @@ sz = np.array(((1, 0), (0, -1)), complex)
 s0 = np.identity(su2) + 0j
 
 
-# Higgs parameters to controll and calibrate
+# Higgs parameters
 
 Lambda = 0.0005
 # k = 0.2
@@ -187,6 +192,8 @@ def Updating_gauge_configuration(U, phi, beta, k):
 
 @njit()
 def HB_Higgs(t, x, y, z, mu, U, phi, k):
+
+    """Equation (A.14) of 1."""
 
     V0 = 0 + 0j
     V1 = V0
@@ -358,6 +365,106 @@ def HB_gauge(staple, beta):
 
 
 @njit()
+def reflectionFunction(t, x, y, z, mu, phi, U, k, comp, phicomp):
+
+    """Reflection function from A.16 of reference 1."""
+
+    if comp == 0:
+        s = s0
+    if comp == 1:
+        s = sx
+    if comp == 2:
+        s = sy
+    if comp == 3:
+        s = sz
+
+    phinew = 0
+    for nu in range(4):
+        a_nu = [0, 0, 0, 0]
+        a_nu[nu] = 1
+        phinew += np.trace(
+            phi[
+                (t + a_nu[0]) % N,
+                (x + a_nu[1]) % N,
+                (y + a_nu[2]) % N,
+                (z + a_nu[3]) % N,
+                nu,
+            ]
+            .conj()
+            .T
+            @ U[t, x, y, z, nu]
+            @ s
+            + s
+            @ U[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+            @ phi[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+        )
+    phinew = phinew * (2 / xi) * 1j * k / 2 - phicomp
+
+    return phinew
+
+
+@njit()
+def OverRelaxationHiggs(phi, U, k):
+
+    """equation A.16 reference 1."""
+
+    for t in range(N):
+        for x in range(N):
+            for y in range(N):
+                for z in range(N):
+                    for mu in range(4):
+                        # print("qua ci arrivi?")
+
+                        phitemp = phi[t, x, y, z, mu]
+
+                        phi0 = phitemp[0, 0].real
+                        phi3 = phitemp[0, 0].imag
+                        phi2 = phitemp[1, 0].real
+                        phi1 = phitemp[1, 0].imag
+
+                        phi0 = reflectionFunction(t, x, y, z, mu, phi, U, k, 0, phi0)
+                        phi1 = reflectionFunction(t, x, y, z, mu, phi, U, k, 1, phi1)
+                        phi2 = reflectionFunction(t, x, y, z, mu, phi, U, k, 2, phi2)
+                        phi3 = reflectionFunction(t, x, y, z, mu, phi, U, k, 3, phi3)
+
+                        phivec = np.array((phi0, phi1, phi2, phi3))
+                        phivec = normalize(phivec)
+
+                        phinew = np.array(
+                            (
+                                (
+                                    phivec[0] + 1j * phivec[3],
+                                    phivec[2] + 1j * phivec[1],
+                                ),
+                                (
+                                    -phivec[2] + 1j * phivec[1],
+                                    phivec[0] - 1j * phivec[3],
+                                ),
+                            )
+                        )
+                        phi[t, x, y, z, mu] = phinew
+
+    return phi
+
+
+@njit()
+def OverRelaxationGauge():
+    return 1
+
+
+@njit()
 def normalize(v):
 
     return v / np.sqrt(v.dot(v))
@@ -457,6 +564,8 @@ def prova(phi):
 @njit()
 def completeHiggsAction(R, T, U, phi, k):
 
+    """Reference 3."""
+
     Wilson = WilsonAction(R, T, U)
 
     kind = 2  # minimal action coupling with higgs
@@ -550,7 +659,7 @@ def extendedHiggsAction(R, T, U, phi, k):
                                     ]
                                 )
                             )
-    return (phi2) / (4 * N ** 4)
+    return (phi2) / (N ** 4)
 
 
 def main(par, measures, beta, k, R, T):
@@ -560,8 +669,10 @@ def main(par, measures, beta, k, R, T):
     U, phi = initialize_fields(1)
 
     betavec = np.linspace(0.1, 8.0, 25).tolist()
-    kvec = np.linspace(0.1, 1.4, 25).tolist()
+    kvec = np.linspace(-2.2, 2.2, 10).tolist()
     results = []
+
+    overrelax = False
 
     if par == "beta":
 
@@ -610,6 +721,10 @@ def main(par, measures, beta, k, R, T):
                 U = Updating_gauge_configuration(U, phi, beta, k)
                 phi = Updating_Higgs(U, phi, beta, k)
 
+                if overrelax:
+                    for _ in range(3):
+                        phi = OverRelaxationHiggs(phi, U, k)
+
                 temp = completeHiggsAction(R, T, U, phi, k)
                 # temp = extendedHiggsAction(R, T, U, phi, k)
                 print(round(temp.real, 4))
@@ -634,7 +749,7 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    main("k", 20, 2.2, 0, 1, 1)
+    main("k", 30, 4.7, 0, 1, 1)
 
     print(f"Execution time: {round(time.time() - start, 2)} secondisegniòç")
 
