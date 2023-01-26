@@ -76,3 +76,26 @@ def quaternion(vec):
 @njit()
 def normalize(v):
     return v / np.sqrt(v.dot(v))
+
+@njit()
+def GramSchmidt(A, exe):
+    """GS orthogonalization, if exe==False => the function normalizes only"""
+
+    n = len(A)
+
+    if exe:
+        A[:, 0] = normalize(A[:, 0])
+
+        for i in range(1, n):
+            Ai = A[:, i]
+            for j in range(0, i):
+                Aj = A[:, j]
+                t = Ai.dot(Aj)
+                Ai = Ai - t * Aj
+            A[:, i] = normalize(Ai)
+    else:
+        for k in range(n):
+            # print(np.linalg.norm(A[:, k]))
+            A[:, k] = A[:, k] / np.linalg.norm(A[:, k])
+
+    return A
