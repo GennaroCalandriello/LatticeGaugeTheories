@@ -13,3 +13,5 @@ Metropolis (N_hits=10)
 This is the first result of Higgs coupling with SU(2), with a comparison (N=7, only heath bath, $\beta$ = 2.2):
 ![su2 secondo risultato N = 7](https://user-images.githubusercontent.com/91687268/213894384-0305dd98-3623-45bc-b08b-945a5b9118c3.png)
 ![su2gaugehiggsvaryingk](https://user-images.githubusercontent.com/91687268/213894392-91c8e736-8851-497c-a0a0-bf11cd8bfca2.png)
+Here another result for SU(2)- Higgs coupling obtained varying k (Higgs coupling)
+![beta_2 5_200_points](https://user-images.githubusercontent.com/91687268/215287564-1f745b9a-df9b-4101-9f41-907532518a37.png)
