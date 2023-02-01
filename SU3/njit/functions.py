@@ -58,6 +58,7 @@ def SU2SingleMatrix():
 
 @njit()
 def checkSU3(O):
+
     det_O = np.linalg.det(O).real
     det_O = round(det_O)
 
@@ -68,6 +69,23 @@ def checkSU3(O):
     if det_O == -1:
         I_alpha = (np.identity(su3) + 0j) * (-1)
         Otilde = np.dot(O, I_alpha)
+
+    return Otilde
+
+
+@njit()
+def checkSU2(O):
+    det_O = np.linalg.det(O).real
+    det_O = round(det_O)
+
+    if det_O == 1:
+        I_alpha = (np.identity(su2) + 0j) * (1)
+        Otilde = np.dot(O, I_alpha)
+
+    if det_O == -1:
+        I_alpha = (np.identity(su2) + 0j) * (-1)
+        Otilde = np.dot(O, I_alpha)
+
     return Otilde
 
 
@@ -78,10 +96,6 @@ def SU3SingleMatrix():
     ss = SU2SingleMatrix()
     tt = SU2SingleMatrix()
 
-    # SU3Matrix = np.array(
-    #     ((0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j))
-    # )
-    # Su3Matrix = np.empty((3, 3)) + 0j
     R = np.array(((rr[0, 0], rr[0, 1], 0), (rr[1, 0], rr[1, 1], 0), (0, 0, 1)))
     S = np.array(((ss[0, 0], 0, ss[0, 1]), (0, 1, 0), (ss[1, 0], 0, ss[1, 1])))
     T = np.array(((1, 0, 0), (0, tt[0, 0], tt[0, 1]), (0, tt[1, 0], tt[1, 1])))
@@ -113,6 +127,155 @@ def initialize_lattice(start, N):
                                 np.random.randint(0, pool_size)
                             ]
     return U
+
+
+@njit()
+def staple_calculus(t, x, y, z, mu, U):
+
+    """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
+    # staple_start = np.zeros((su3, su3), complex)
+    staple_start = np.array(
+        ((0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j),)
+    )
+    # staple_start = np.empty((3, 3)) + 0j
+
+    a_mu = [0, 0, 0, 0]
+    a_mu[mu] = 1
+
+    for nu in range(4):
+
+        if mu != nu:
+            # nu = 0
+            # while nu < mu:
+            a_nu = [0, 0, 0, 0]
+            a_nu[nu] = 1
+
+            # product of 6 matrices
+            staple_start += (
+                U[
+                    (t + a_mu[0]) % N,
+                    (x + a_mu[1]) % N,
+                    (y + a_mu[2]) % N,
+                    (z + a_mu[3]) % N,
+                    nu,
+                ]
+                @ U[
+                    (t + a_nu[0]) % N,
+                    (x + a_nu[1]) % N,
+                    (y + a_nu[2]) % N,
+                    (z + a_nu[3]) % N,
+                    mu,
+                ]
+                .conj()
+                .T
+                @ U[t, x, y, z, nu].conj().T
+            )
+
+            staple_start += (
+                U[
+                    (t + a_mu[0] - a_nu[0]) % N,
+                    (x + a_mu[1] - a_nu[1]) % N,
+                    (y + a_mu[2] - a_nu[2]) % N,
+                    (z + a_mu[3] - a_nu[3]) % N,
+                    nu,
+                ]
+                .conj()
+                .T
+                @ U[
+                    (t - a_nu[0]) % N,
+                    (x - a_nu[1]) % N,
+                    (y - a_nu[2]) % N,
+                    (z - a_nu[3]) % N,
+                    mu,
+                ]
+                .conj()
+                .T
+                @ U[
+                    (t - a_nu[0]) % N,
+                    (x - a_nu[1]) % N,
+                    (y - a_nu[2]) % N,
+                    (z - a_nu[3]) % N,
+                    nu,
+                ]
+            )
+            # nu += 1
+        else:
+            continue
+
+    return staple_start
+
+
+@njit()
+def staple_calculusProvaScema(t, x, y, z, mu, U):
+
+    """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
+    # staple_start = np.zeros((su3, su3), complex)
+    staple_start = np.array(
+        ((0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j),)
+    )
+    # staple_start = np.empty((3, 3)) + 0j
+
+    a_mu = [0, 0, 0, 0]
+    a_mu[mu] = 1
+
+    for nu in range(mu + 1, 4):
+
+        # nu = 0
+        # while nu < mu:
+        a_nu = [0, 0, 0, 0]
+        a_nu[nu] = 1
+
+        # product of 6 matrices
+        staple_start += (
+            U[
+                (t + a_mu[0]) % N,
+                (x + a_mu[1]) % N,
+                (y + a_mu[2]) % N,
+                (z + a_mu[3]) % N,
+                nu,
+            ]
+            @ U[
+                (t + a_nu[0]) % N,
+                (x + a_nu[1]) % N,
+                (y + a_nu[2]) % N,
+                (z + a_nu[3]) % N,
+                mu,
+            ]
+            .conj()
+            .T
+            @ U[t, x, y, z, nu].conj().T
+        )
+
+        staple_start += (
+            U[
+                (t + a_mu[0] - a_nu[0]) % N,
+                (x + a_mu[1] - a_nu[1]) % N,
+                (y + a_mu[2] - a_nu[2]) % N,
+                (z + a_mu[3] - a_nu[3]) % N,
+                nu,
+            ]
+            .conj()
+            .T
+            @ U[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                mu,
+            ]
+            .conj()
+            .T
+            @ U[
+                (t - a_nu[0]) % N,
+                (x - a_nu[1]) % N,
+                (y - a_nu[2]) % N,
+                (z - a_nu[3]) % N,
+                nu,
+            ]
+        )
+        # nu += 1
+
+    return staple_start
 
 
 @njit()
@@ -256,12 +419,16 @@ def det_calculus(W, manual=False):
 @njit()
 def normalize(v):
 
-    return v / np.sqrt(v.dot(v))
+    sum = 0
+    for i in range(len(v)):
+        sum += v[i] ** 2
+
+    return v / np.sqrt(sum)
 
 
 @njit()
 def GramSchmidt(A, exe):
-    '''GS orthogonalization, if exe==False => the function normalizes only'''
+    """GS orthogonalization, if exe==False => the function normalizes only"""
 
     n = len(A)
 
@@ -312,16 +479,72 @@ def gram_schmidt(A):
 
 
 @njit()
+def sample_HB_SU2(su2matrix, beta):
+
+    detStaple = np.linalg.det(su2matrix)
+    alpha = np.sqrt(detStaple)
+
+    r1 = 1 - np.random.uniform(0, 1)
+    r2 = 1 - np.random.uniform(0, 1)
+    r3 = 1 - np.random.uniform(0, 1)
+
+    lambda2 = (
+        -1
+        / (2 * alpha * beta)
+        * (np.log(r1) + np.cos(2 * np.pi * r2) ** 2 * np.log(r3))
+    )
+
+    while np.random.uniform(0, 1) ** 2 > (1 - lambda2.real):
+
+        r1 = 1 - np.random.uniform(0, 1)
+        r2 = 1 - np.random.uniform(0, 1)
+        r3 = 1 - np.random.uniform(0, 1)
+
+        lambda2 = (
+            -1
+            / (2 * alpha * beta)
+            * (np.log(r1) + np.cos(2 * np.pi * r2) ** 2 * np.log(r3))
+        )
+
+    x0 = 1 - 2 * lambda2
+
+    a0 = x0
+
+    a1 = np.random.uniform(-1, 1)
+    a2 = np.random.uniform(-1, 1)
+    a3 = np.random.uniform(-1, 1)
+
+    while np.sqrt((a1 ** 2 + a2 ** 2 + a3 ** 2)) > 1:
+
+        a1 = 1 - np.random.uniform(-1, 1)
+        a2 = 1 - np.random.uniform(-1, 1)
+        a3 = 1 - np.random.uniform(-1, 1)
+
+    # Ulink = np.array(((a0 + 1j * a3, a2 + 1j * a1), (-a2 + 1j * a1, a0 - 1j * a3)))
+    Ulink = a0 * np.identity(su2) + 1j * a1 * sx + 1j * a2 * sy + 1j * a3 * sz
+
+    Ulink = GramSchmidt(Ulink, True)
+    Ulink = GramSchmidt(Ulink, False)
+
+    return Ulink
+
+
+@njit()
 def quaternion(vec):
 
     """produces quaternion from a vector of complex and real numbers"""
 
-    a11 = vec[0] + vec[3] * 1j
-    a12 = vec[2] + vec[1] * 1j
-    a21 = -vec[2] + vec[1] * 1j
-    a22 = vec[0] - vec[3] * 1j
+    # a11 = vec[0] + vec[3] * 1j
+    # a12 = vec[2] + vec[1] * 1j
+    # a21 = -vec[2] + vec[1] * 1j
+    # a22 = vec[0] - vec[3] * 1j
+    a11 = complex(vec[0], vec[3])
+    a12 = complex(vec[2], vec[1])
+    a21 = complex(-vec[2], vec[1])
+    a22 = complex(vec[0], -vec[3])
 
     quat = np.array(((a11, a12), (a21, a22)))
+    ##########maybe should be normalized
 
     return quat
 
@@ -335,7 +558,7 @@ def sampleA(a, beta):
     xtrial = np.random.uniform(0, 1) * (1 - w) + w
     a0 = 1 + np.log(xtrial) / (beta * a)
 
-    while (1 - a0 ** 2) < np.random.uniform(0, 1):
+    while np.sqrt(1 - a0 ** 2) < np.random.uniform(0, 1):
         xtrial = np.random.uniform(0, 1) * (1 - w) + w
         a0 = 1 + np.log(xtrial) / (beta * a)
 
@@ -344,10 +567,10 @@ def sampleA(a, beta):
     a2 = np.random.normal()
     a3 = np.random.normal()
 
-    while (a1 ** 2 + a2 ** 2 + a3 ** 2) > 1:
-        a1 = np.random.normal()
-        a2 = np.random.normal()
-        a3 = np.random.normal()
+    # while (a1 ** 2 + a2 ** 2 + a3 ** 2) > 1:
+    #     a1 = np.random.normal()
+    #     a2 = np.random.normal()
+    #     a3 = np.random.normal()
 
     norm = np.sqrt(a1 ** 2 + a2 ** 2 + a3 ** 2)
 
@@ -370,9 +593,17 @@ def getA(W):
     a1 = ((W[0, 1] + W[1, 0])).imag / 2
     a2 = ((W[0, 1] - W[1, 0])).real / 2
     a3 = ((W[0, 0] - W[1, 1])).imag / 2
-    Avector = [a0, a1, a2, a3]
+    Avector = np.array((a0, a1, a2, a3))  # [a0, a1, a2, a3]
 
     return Avector
+
+
+@njit()
+def HeatbathReconstructed():
+
+    """From: Lattice Simulations of the SU(2) multi-Higgs fields"""
+
+    return 1
 
 
 @njit()

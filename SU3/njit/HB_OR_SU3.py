@@ -10,7 +10,7 @@ import parameters as par
 su3 = par.su3
 su2 = par.su2
 epsilon = par.epsilon
-N = 5
+N = par.N
 pool_size = par.pool_size
 
 sx = np.array(((0, 1), (1, 0)), complex)
@@ -95,7 +95,7 @@ def OverRelaxation_update(U, N):
         for SU(3) lattice gauge theories"""
 
     # I don't know if it works good!
-    somma = 0
+
     for t in range(N):
         for x in range(N):
             for y in range(N):
@@ -114,35 +114,25 @@ def OverRelaxation_update(U, N):
 
                             # A = A / a
                             Adagger = A.conj().T
-                            H = np.dot(Adagger, A) ** 0.5
+                            H = np.sqrt(Adagger @ A)
                             O = A @ (1 / H)
+                            O = GramSchmidt(O, True)
 
-                            O = GramSchmidt(
-                                O, exe=False
-                            )  # with exe=False the matrix is only normalized
                             det_O = np.linalg.det(O.conj().T).real
 
-                            if round(det_O) != 0:
-
-                                # if round(det_O) == 1:
-                                #     I_alpha = (np.identity(su3) + 0j) * (1)
-                                #     Otilde = np.dot(O, I_alpha)
-
-                                # if round(det_O) == -1:
-                                #     I_alpha = (np.identity(su3) + 0j) * (-1)
-                                #     Otilde = np.dot(O, I_alpha)
+                            if (det_O) != 0:
 
                                 V = diagonalization(H)
 
-                                Uprime = np.dot(V, np.dot(Utemp, np.dot(O, V.conj().T)))
+                                Uprime = V @ Utemp @ O @ V.conj().T
 
                                 reflection = np.random.randint(1, 4)
 
                                 Uprime = reflectionSU3(Uprime, reflection)
-                                Ufinal = np.dot(
-                                    V.conj().T, np.dot(Uprime, np.dot(V, O.conj().T)),
-                                )
 
+                                Ufinal = V.conj().T @ Uprime @ V @ O.conj().T
+
+                                # Ufinal = GramSchmidt(Ufinal, exe=True)
                                 detU = np.linalg.det(Ufinal).real
 
                                 if round(detU) == 1:
@@ -154,8 +144,81 @@ def OverRelaxation_update(U, N):
                                     Ufinal = np.dot(Ufinal, I_alpha)
 
                                 U[t, x, y, z, mu] = Ufinal
+                        else:
+                            U[t, x, y, z, mu] = SU3SingleMatrix()
 
     return U
+
+
+@njit()
+def OverRelaxation_(U, N):
+
+    """Ettore Vicari, An overrelaxed Monte Carlo algorithm
+        for SU(3) lattice gauge theories"""
+
+    # I don't know if it works good!
+
+    for t in range(N):
+        for x in range(N):
+            for y in range(N):
+                for z in range(N):
+
+                    # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
+
+                    for mu in range(4):
+
+                        Utemp = U[t, x, y, z, mu]
+
+                        A = staple_calculus(t, x, y, z, mu, U)
+                        a = np.sqrt(np.linalg.det(A))
+                        A = A / a
+                        # print("dettofatto", np.linalg.det(A))
+                        Adagger = A.conj().T
+
+                        Atemp = Adagger @ A
+                        H = matrixsqrt(Atemp)  # H is Hermitean matrix, controlled
+
+                        O = A @ (1 / H)  # @ invMatrix(H)
+                        # O = np.divide(A, H)
+                        det_O = np.linalg.det(O)
+
+                        if round(det_O.real) == 1:
+
+                            I_alpha = (np.identity(su3) + 0j) * (1)
+                            O = np.dot(O, I_alpha)
+
+                        if round(det_O.real) == -1:
+
+                            I_alpha = (np.identity(su3) + 0j) * (-1)
+                            O = np.dot(O, I_alpha)
+
+                        V = diagonalization(H)
+                        # Uprime = V @ Utemp @ Otilde @ V.conj().T
+                        # Uprime = reflectionSU3(Uprime, np.random.randint(0, 4))
+
+                        Urefl = V @ Utemp @ O @ V.conj().T
+                        Urefl = reflectionSU3(Urefl, np.random.randint(0, 4))
+                        Uprime = V.conj().T @ Urefl @ V @ O.conj().T
+
+                        # print(np.linalg.det(Uprime))
+                        U[t, x, y, z, mu] = Uprime
+    return U
+
+
+@njit()
+def matrixsqrt(M):
+
+    evals, evecs = np.linalg.eig(M)
+    sqrt = evecs @ np.diag(np.sqrt(evals)) @ np.linalg.inv(evecs)
+
+    return sqrt
+
+
+@njit()
+def invMatrix(M):
+    evals, evecs = np.linalg.eig(M)
+    inv = evecs @ np.diag(1 / evals) @ np.linalg.inv(evecs)
+    return inv
 
 
 @njit()
@@ -185,6 +248,9 @@ def heatbath_SU3(W, beta, subgrp, kind=1):
 
         else:
             return SU2SingleMatrix()
+
+    if kind == 2:
+        return sample_HB_SU2(Wsub, beta)
 
 
 @njit()
@@ -237,10 +303,6 @@ def WilsonAction(R, T, U):
                 for z in range(N):
 
                     # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
-                    # U[N - 1, x, y, z] = U[0, x, y, z]
-                    # U[t, N - 1, y, z] = U[t, 0, y, z]
-                    # U[t, x, N - 1, z] = U[t, x, 0, z]
-                    # U[t, x, y, N - 1] = U[t, x, y, 0]
 
                     for nu in range(4):
 
@@ -372,22 +434,18 @@ if __name__ == "__main__":
 
     import time
 
-    measures = 40
+    measures = 20
     idecorrel = par.idecorrel
 
     R = 1
     T = 1
-    beta_vec = (np.linspace(0.1, 8, 50)).tolist()
+    beta_vec = (np.linspace(0.1, 10, 20)).tolist()
     U = initialize_lattice(1, N)
 
-    s = SU3SingleMatrix()
-
-    print(np.trace(s), np.linalg.det(s))
-
     # which kind of link update would you like to use?
-    overrelax = False
+    overrelax = True
     metropolis = False
-    heatbath = True
+    heatbath = False
 
     Smean = []
     Smean2 = []
@@ -419,15 +477,20 @@ if __name__ == "__main__":
                 U = Metropolis(U, beth, hits=10)
 
             if overrelax:
-                for _ in range(idecorrel):
-                    U = OverRelaxation_update(U, N)
+                for _ in range(1):
+                    U = OverRelaxation_(U, N)
 
+            # two different wilson loops
             temp = WilsonAction(R, T, U)
-            # U = Unew
+            temp2 = WilsonAction(3, 3, U)
+
             print(temp)
 
             obs.append(temp)
+            obsame.append(temp2)
         Smean.append(np.mean(obs))
+        Smean2.append(np.mean(obsame))
+
     print(f"Execution time: {round(time.time() - start, 2)} s")
     plt.figure()
     plt.title(
@@ -435,8 +498,9 @@ if __name__ == "__main__":
         fontsize=17,
     )
     plt.plot(beta_vec, Smean, "go")
-    plt.xlabel(r"$\beta$")
-    plt.ylabel(r"<$S_{W_{11}}$>")
-    plt.legend()
+    plt.plot(beta_vec, Smean2, "bo")
+    plt.xlabel(r"$\beta$", fontsize=15)
+    plt.ylabel(r"<$S_{W_{11}}$>", fontsize=15)
+    plt.legend(["W11", "W22"])
     plt.show()
 
