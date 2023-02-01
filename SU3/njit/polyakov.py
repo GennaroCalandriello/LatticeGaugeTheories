@@ -5,35 +5,29 @@ from numba import njit
 from functions import *
 from HB_OR_SU3 import *
 
-measures = 5000
+measures = 4000
 
 
-def Polyakovmacomecazz(U):
+def Polyakov1(U, r):
+    """Try correlation of Polyakov loops to approximate quark antiquark potential"""
 
-    trace1 = []
-    for x in range(N):
-        for y in range(N):
-            for z in range(N):
-                poly1 = np.identity(su3) + 0j
-                for t in range(N):
-                    poly1 = poly1 @ U[x, y, z, t, 3]
+    trace1 = 0
+    trace2 = 0
 
-                trace1.append(np.trace(poly1))
-
-    return np.mean(np.array(trace1))
-
-
-def Polyakov3(U):
-
-    trace1 = []
-    a1, a2, a3 = 0, 0, 1
+    a1, a2, a3 = 0, 0, 0
     poly1 = np.identity(su3) + 0j
+    poly2 = poly1.copy()
+
     for t in range(N):
+
         poly1 = poly1 @ U[a1, a2, a3, t, 3]
+        poly2 = poly2 @ U[(a1 + r) % N, (a2 + r) % N, (a3 + r) % N, t, 3]
 
-    trace1 = np.trace(poly1) / su3
+    trace1 = (np.trace(poly1)) / su3
+    trace2 = (np.trace(poly2.conj().T)) / su3
+    prod = trace1 * trace2
 
-    return trace1
+    return prod
 
 
 @njit()
@@ -61,29 +55,19 @@ def Polyakov2(U, beta):
     return somma / N ** 3
 
 
-@njit()
-def Polyakov2punto1(U, beta):
+def Polyakov3(U):
 
-    """Sum of product of Polyakov loop, it's an order parameter for the phase transition in pure gauge theory
-    from the confinement to the deconfinement phase. The Polyakov loop is related to the quark-antiquark 
-    potential. For definition see Gattringer and reference 1."""
+    """Poduct of link variables on time loops, for 4th direction"""
 
-    somma = 0
-    sommavec = []
+    trace1 = []
+    a1, a2, a3 = 0, 0, 1
+    poly1 = np.identity(su3) + 0j
+    for t in range(N):
+        poly1 = poly1 @ U[a1, a2, a3, t, 3]
 
-    for x in range(N):
-        for y in range(N):
-            for z in range(N):
-                loop = np.identity(su3) + 0j
-                for t in range(0, N):
-                    # U[x, y, z, t] = PeriodicBC(U, x, y, z, t, N)
-                    loop = loop @ U[x, y, z, t, 3]  # product only in one mu-direction
+    trace1 = np.trace(poly1) / su3
 
-                somma += 1 / 3 * np.trace(loop)
-                sommavec.append(somma)
-    sommavec = np.array(sommavec) / N ** 3
-
-    return np.mean(sommavec)
+    return trace1
 
 
 def main3(U, beta):
@@ -120,17 +104,22 @@ def main2(U, beta):
     return np.mean(obs)
 
 
-def main2punto1(U, beta):
-    print("exe for beta ", beta)
+def main1(U, beta, r):
+
+    print("exe for r=", r)
+    correlator = 0
     obs = []
     for m in range(measures):
-        print("measure ", m)
+
+        if m % 20 == 0:
+            print("measure", m)
+
         U = HB_updating_links(beta, U, N)
+        temp = Polyakov1(U, r)
+        obs.append(abs(temp))
+    correlator = np.mean(obs)
 
-        temp = Polyakov2punto1(U, beta)
-        obs.append((temp))
-
-    return np.mean(np.array(obs))
+    return correlator
 
 
 if __name__ == "__main__":
@@ -141,8 +130,8 @@ if __name__ == "__main__":
     U = initialize_lattice(1, N)
     betavec = np.linspace(5, 9, 15).tolist()
 
-    polyak1 = False
-    polyak2 = True
+    polyak1 = True
+    polyak2 = False
     polyak3 = False
 
     if polyak3:
@@ -184,3 +173,21 @@ if __name__ == "__main__":
         plt.legend()
         plt.show()
 
+    if polyak1:
+
+        rvec = range(N)
+        betacorr = 5.8
+        print(rvec)
+        # try correlation function of Polyakov loop for q-qbar potential V(r)
+        with multiprocessing.Pool(processes=N) as pool:
+            part = partial(main1, U, betacorr)
+            results = np.array(pool.map(part, rvec))
+            pool.close()
+            pool.join()
+
+        plt.title(r"Polyakov correlator q-qbar potential")
+        plt.plot(rvec, -np.log(results) / N, "bo")
+        plt.ylabel(r"$-ln(<TrP(x)TrP(y)>)$", fontsize=15)
+        plt.xlabel(r"$r$", fontsize=15)
+        plt.legend()
+        plt.show()
