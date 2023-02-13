@@ -1,12 +1,13 @@
 import numpy as np
 from numba import njit
 
-su2=2
+su2 = 2
 
 sx = np.array(((0, 1), (1, 0)), complex)
 sy = np.array(((0, -1j), (1j, 0)), complex)
 sz = np.array(((1, 0), (0, -1)), complex)
 s0 = np.identity(su2)
+
 
 @njit()
 def getA(W):
@@ -76,6 +77,7 @@ def quaternion(vec):
 @njit()
 def normalize(v):
     return v / np.sqrt(v.dot(v))
+
 
 @njit()
 def GramSchmidt(A, exe):

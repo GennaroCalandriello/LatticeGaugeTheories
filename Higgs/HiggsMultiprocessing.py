@@ -35,10 +35,10 @@ def main(par, kvec, measures, beta):
 
             for i in range(measures):
 
-                U = Updating_gauge_configuration(U, phi, beta, k)
+                U = HeatBath_update(U, phi, beta, k)
                 phi = Updating_Higgs(U, phi, beta, k)
 
-                temp = completeHiggsAction(R, T, U, phi, k)
+                temp = WilsonHiggsAction(R, T, U, phi, k)
                 print(temp)
                 obs.append(temp)
 
@@ -61,10 +61,10 @@ def main(par, kvec, measures, beta):
 
             for i in range(measures):
 
-                U = Updating_gauge_configuration(U, phi, beta, k)
+                U = HeatBath_update(U, phi, beta, k)
                 phi = Updating_Higgs(U, phi, beta, k)
 
-                temp = completeHiggsAction(R, T, U, phi, k)
+                temp = WilsonHiggsAction(R, T, U, phi, k)
                 # temp = extendedHiggsAction(R, T, U, phi, k)
                 print(round(temp.real, 4))
                 obs.append(temp)

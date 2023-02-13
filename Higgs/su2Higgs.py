@@ -4,12 +4,12 @@ import matplotlib.pyplot as plt
 import numpy.random as ran
 
 from functions import *
+from stoutsmearing import *
 
 su2 = 2
-N = 6
+N = 8
 
 """This code refers to the works: 
-
 1. "Numerical Simulations of
     Gauge-Higgs Models on the Lattice", of Jochen Heitger, 1997
 2. "Lattice Simulation of SU(2) Multi Higgs fields", Mark B. Wurtz
@@ -52,6 +52,50 @@ def initialize_fields(start):
                             U[t, x, y, z, mu] = SU2SingleMatrix()
 
     return U, UHiggs
+
+
+@njit()
+def HiggsCouplingStaple(phi, t, x, y, z, mu, k, beta):
+
+    a_mu = [0, 0, 0, 0]
+    a_mu[mu] = 1
+    kind = 2
+
+    if kind == 1:
+        stapleHiggs = -k * (
+            phi[
+                (t + a_mu[0]) % N,
+                (x + a_mu[1]) % N,
+                (y + a_mu[2]) % N,
+                (z + a_mu[3]) % N,
+                mu,
+            ]
+            .conj()
+            .T
+            @ phi[t, x, y, z, mu]
+            + phi[t, x, y, z, mu].conj().T
+            @ phi[
+                (t + a_mu[0]) % N,
+                (x + a_mu[1]) % N,
+                (y + a_mu[2]) % N,
+                (z + a_mu[3]) % N,
+                mu,
+            ]
+        )
+
+    if kind == 2:
+        stapleHiggs = k * (
+            phi[
+                (t + a_mu[0]) % N,
+                (x + a_mu[1]) % N,
+                (y + a_mu[2]) % N,
+                (z + a_mu[3]) % N,
+                mu,
+            ]
+            @ phi[t, x, y, z, mu].conj().T
+        )
+
+    return stapleHiggs
 
 
 @njit()
@@ -121,30 +165,30 @@ def Higgs_staple_calculus(t, x, y, z, mu, U, phi, k, beta, couplingHiggs):
                     nu,
                 ]
             )
-            # nu += 1
         else:
             continue
 
     """equation 3.34"""
     if couplingHiggs:
 
-        HiggsCoupled = 0.5 * beta * staple_start + k * (
-            phi[
-                (t + a_mu[0]) % N,
-                (x + a_mu[1]) % N,
-                (y + a_mu[2]) % N,
-                (z + a_mu[3]) % N,
-                mu,
-            ]
-            @ phi[t, x, y, z, mu].conj().T
+        # HiggsCoupled = 0.5 * beta * staple_start + k * (
+        #     phi[
+        #         (t + a_mu[0]) % N,
+        #         (x + a_mu[1]) % N,
+        #         (y + a_mu[2]) % N,
+        #         (z + a_mu[3]) % N,
+        #         mu,
+        #     ]
+        #     @ phi[t, x, y, z, mu].conj().T
+        # )
+        HiggsCoupled = 0.5 * beta * staple_start + HiggsCouplingStaple(
+            phi, t, x, y, z, mu, k, beta
         )
 
         return HiggsCoupled
 
     else:
         return 0.5 * beta * staple_start
-    # print("staple", np.linalg.det(staple_start))
-    # print("higgsstaple", HiggsCoupled - beta * staple_start)
 
 
 @njit()
@@ -432,12 +476,18 @@ def OverRelaxationSU2(t, x, y, z, mu, U, phi, beta, k):
 
     if v != 0:
 
-        V = V / (np.sqrt(v))
+        # V = V / (np.sqrt(v))
+        V, _ = MatrixNormalization(V)
         Uprime = V.conj().T @ Utemp.conj().T @ V.conj().T
 
         U[t, x, y, z, mu] = Uprime
 
     return U[t, x, y, z, mu]
+
+
+@njit()
+def dagger(a):
+    return a.conj().T
 
 
 @njit()
@@ -458,6 +508,8 @@ def Updating_Higgs(U, phi, beta, k):
 @njit()
 def OverRelaxation_update(U, phi, beta, k):
 
+    """L'Over-relaxation su SU2 non funziona, il campo non ha simmetria Z2 esatta"""
+
     for t in range(N):
         for x in range(N):
             for y in range(N):
@@ -470,7 +522,7 @@ def OverRelaxation_update(U, phi, beta, k):
 
                         U[t, x, y, z, mu] = OverRelaxationSU2(
                             t, x, y, z, mu, U, phi, beta, k
-                        )
+                        )  # + HiggsCouplingStaple(phi, t, x, y, z, mu, k, beta)
 
     return U, phi
 
@@ -597,16 +649,11 @@ def prova(phi):
 
 
 @njit()
-def completeHiggsAction(R, T, U, phi, k):
+def WilsonHiggsAction(R, T, U, phi, k):
 
     """Reference 3."""
 
     Wilson = WilsonAction(R, T, U)
-
-    kind = 2  # minimal action coupling with higgs
-
-    phi1 = 0
-    phi2 = 0
     phi3 = 0
 
     for t in range(N):
@@ -645,71 +692,66 @@ def completeHiggsAction(R, T, U, phi, k):
 
 
 @njit()
-def extendedHiggsAction(R, T, U, phi, k):
+def HiggsAction(R, T, U, phi, k):
 
-    Wilson = WilsonAction(R, T, U)
-
-    kind = 2  # minimal action coupling with higgs
-
-    phi1 = 0
-    phi2 = 0
     phi3 = 0
 
     for t in range(N):
         for x in range(N):
             for y in range(N):
                 for z in range(N):
-                    for mu in range(1, 4):
+                    for mu in range(4):
 
-                        phi1 += 0.5 * np.trace(
-                            phi[t, x, y, z, mu].conj().T @ phi[t, x, y, z, mu]
-                        )
-                        phi2 += (
-                            Lambda
-                            * (
-                                0.5
-                                * np.trace(
-                                    phi[t, x, y, z, mu].conj().T @ phi[t, x, y, z, mu]
-                                )
-                                - 1
+                        nu = mu
+                        a_nu = [0, 0, 0, 0]
+                        a_nu[nu] = 1
+                        phi3 += (
+                            -k
+                            * 0.5
+                            * np.trace(
+                                phi[t, x, y, z, nu].conj().T
+                                @ U[
+                                    (t + a_nu[0]) % N,
+                                    (x + a_nu[1]) % N,
+                                    (y + a_nu[2]) % N,
+                                    (z + a_nu[3]) % N,
+                                    nu,
+                                ]
+                                @ phi[
+                                    (t + a_nu[0]) % N,
+                                    (x + a_nu[1]) % N,
+                                    (y + a_nu[2]) % N,
+                                    (z + a_nu[3]) % N,
+                                    nu,
+                                ]
                             )
-                            ** 2
                         )
 
-                        for nu in range(4):
-                            a_nu = [0, 0, 0, 0]
-                            a_nu[nu] = 1
-                            phi3 += (
-                                -k
-                                * 2
-                                * np.trace(
-                                    phi[t, x, y, z, nu].conj().T
-                                    @ U[t, x, y, z, nu]
-                                    @ phi[
-                                        (t + a_nu[0]) % N,
-                                        (x + a_nu[1]) % N,
-                                        (y + a_nu[2]) % N,
-                                        (z + a_nu[3]) % N,
-                                        nu,
-                                    ]
-                                )
-                            )
-    return (phi2) / (N ** 4) + phi1 / (4 * N ** 4) + phi3 / N ** 4 + Wilson
+    return phi3 / (N ** 4)
 
 
-def main(par, measures, beta, kvec, k, R, T):
+def main(measures, beta, k, R, T, kvec):
 
     """par specify which parameter do you want to vary during sim., k (per beta che varia), beta (per k che varia), R e T estensione del Wilson loop"""
 
-    U, phi = initialize_fields(1)
-
     betavec = np.linspace(0.1, 8.0, 25).tolist()
+    par = "k"
 
     results = []
     susceptibility = []
 
-    overrelax = True
+    overrelax = False
     heatbath = True
+    thermalization = False
+
+    U, phi = initialize_fields(1)
+
+    if thermalization:  # termalizzo il sistema prima delle misure
+        print("Sto termalizzando il sistema")
+        therm = 20
+        for t in range(therm):
+            print(f"{t}/{therm}")
+            U, phi = HeatBath_update(U, phi, beta, min(kvec))
 
     if par == "k":
 
@@ -723,15 +765,17 @@ def main(par, measures, beta, kvec, k, R, T):
 
             for i in range(measures):
 
-                U, phi = HeatBath_update(U, phi, beta, k)
+                if heatbath:
+                    U, phi = HeatBath_update(U, phi, beta, k)  # phidagger=phi
 
                 if overrelax:
+
                     for _ in range(2):
                         # phi = OverRelaxationHiggs(phi, U, k)
                         U, phi = OverRelaxation_update(U, phi, beta, k)
 
-                temp = completeHiggsAction(R, T, U, phi, k)
-                # temp = extendedHiggsAction(R, T, U, phi, k)
+                # temp = WilsonHiggsAction(R, T, U, phi, k)
+                temp = HiggsAction(R, T, U, phi, k)
                 # temp = WilsonAction(R, T, U)
                 print(round(temp.real, 16))
                 print("imaginary part:", round(temp.imag, 4))
@@ -749,55 +793,54 @@ def main(par, measures, beta, kvec, k, R, T):
         # plt.ylabel(r"$\phi^2+\phi^4$", fontsize=20)
         plt.ylabel(r"$<S>$", fontsize=20)
         plt.legend([f"beta = {beta}"])
-        plt.plot(kvec, results, "bo-")
+        plt.plot(kvec, results, "bo")
         plt.show()
-        # np.savetxt(f"resuts_beta_{beta}.txt", results)
+        np.savetxt(f"resuts_beta_{beta}.txt", results)
 
-        # if par == "beta":
 
-        # beta = 0
+def mainMultiprocessing(measures, beta, R, T, k):
+    print("execution for k: ", k)
 
-        # for beta in betavec:
+    U, phi = initialize_fields(1)
+    obs = []
 
-        #     print(
-        #         f"exe for beta = {beta}, remaining {len(betavec)-betavec.index(beta)}"
-        #     )
+    # a few thermalization
+    print("termalizzo")
+    for _ in range(50):
+        U, phi = HeatBath_update(U, phi, beta, k)
 
-        #     obs = []
+    # measures
+    for m in range(measures):
 
-        #     for i in range(measures):
+        U, phi = HeatBath_update(U, phi, beta, k)
 
-        #         U = Updating_gauge_configuration(U, phi, beta, k)
-        #         phi = Updating_Higgs(U, phi, beta, k)
+        temp = HiggsAction(R, T, U, phi, k)
 
-        #         # temp = completeHiggsAction(R, T, U, phi, k)
-        #         temp = extendedHiggsAction(R, T, U, phi, k)
-        #         print(temp)
-        #         obs.append(temp)
+        if m % 20 == 0:
+            print(f"Measure: {m}, k: {k}")
 
-        #     results.append(np.mean(obs).real)
-        #     print("mean", np.mean(obs))
+        obs.append(temp)
 
-        # plt.figure()
-        # plt.title(r"$\phi^2+\phi^4$  Heat Bath", fontsize=23)
-        # plt.xlabel(r"$\beta$", fontsize=16)
-        # plt.ylabel(r"<$S_{SU2}$+$S_{Higgs}$>", fontsize=20)
-        # plt.legend([r"$\beta$ = {0.8}"])
-        # plt.plot(betavec, susceptibility, "bo--")
-        # plt.show()
+    print("End for k: ", k)
+    obs = np.array(obs)
+
+    return np.mean(obs)
 
 
 if __name__ == "__main__":
 
     import time
+    import multiprocessing
+    from functools import partial
 
     graph = False
+    multiprocess = True
     start = time.time()
-    measures = 3
-    beta = 2.5
-    numberofk = 30
-    kmin = 0.0
-    kmax = 1.4
+    measures = 300
+    beta = 4.0
+    numberofk = 20
+    kmin = -1.0
+    kmax = 1.0
     kvec = np.linspace(kmin, kmax, numberofk).tolist()
 
     if graph:
@@ -813,5 +856,19 @@ if __name__ == "__main__":
         plt.show()
 
     else:
-        main("k", measures, beta, kvec, 0, 1, 1)
+        if multiprocess:
+            with multiprocessing.Pool(processes=len(kvec)) as pool:
+                perparti = partial(mainMultiprocessing, measures, beta, 1, 1)
+                res = np.array(pool.map(perparti, kvec))
+                pool.close()
+                pool.join()
+
+            np.savetxt(f"results_beta{beta}.txt", res)
+
+            plt.figure()
+            plt.plot(kvec, res, "go--")
+            plt.show()
+
+        else:
+            main(measures, beta, 0, 1, 1, kvec)
 

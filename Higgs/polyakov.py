@@ -36,7 +36,7 @@ def Polyakov2(U, beta):
                 for t in range(N):
                     loop = loop @ U[z, x, y, t, 3]  # product only in one mu-direction
 
-                somma += 0.5 * np.trace(loop)
+                somma += 1 / 3 * np.trace(loop)
 
     return somma / N ** 3
 
@@ -45,8 +45,8 @@ if __name__ == "__main__":
 
     U, _ = initialize_fields(1)
 
-    betavec = np.linspace(2.0, 6, 150).tolist()
-    measures = 20
+    betavec = np.linspace(2.0, 6, 15).tolist()
+    measures = 10
     m = [1, 1, 1]
 
     polyakovloop = []
@@ -56,14 +56,15 @@ if __name__ == "__main__":
         print(f"exe for beta = {beta}, remaining: {len(betavec)-betavec.index(beta)}")
 
         for i in range(measures):
+            
             U, _ = HeatBath_update(
                 U, _, beta, 0
             )  # with k=0 ht heatbath reproduces the distribution of pure gauge SU(2)
 
             # Poly = Polyakov(U, m, 0, beta)
             Poly = Polyakov2(U, beta)
-            obs.append(abs(Poly))
-            print(abs(Poly))
+            obs.append((Poly))
+            print((Poly))
 
         polyakovloop.append(np.mean(np.abs(obs)))
 
