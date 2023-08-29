@@ -5,15 +5,28 @@ from algebra import *
 from randomSU2 import *
 import parameters as par
 
+import warnings
+from numba.core.errors import NumbaPerformanceWarning
+
+""" Some references:
+1.  A MODIFIED HEAT BATH METHOD SUITABLE FOR MONTE CARLO SIMULATIONS
+ON VECTOR AND PARALLEL PROCESSORS, K. FREDENHAGEN and M. MARCU"""
+
+
+# Disable the performance warning
+warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+
 su3 = par.su3
 su2 = par.su2
 epsilon = par.epsilon
-N = par.N
+Ns = par.Ns
+Nt = par.Nt
 pool_size = par.pool_size
 
-sx = np.array(((0, 1), (1, 0)), complex)
-sy = np.array(((0, -1j), (1j, 0)), complex)
-sz = np.array(((1, 0), (0, -1)), complex)
+
+sx = np.array(((0, 1), (1, 0)), dtype=np.complex128)
+sy = np.array(((0, -1j), (1j, 0)), dtype=np.complex128)
+sz = np.array(((1, 0), (0, -1)), dtype=np.complex128)
 
 
 def SU3_pool_generator(pool_size):
@@ -22,7 +35,7 @@ def SU3_pool_generator(pool_size):
 
     # following pag 83 Gattringer
     su2_pool = SU2_pool_generator(pool_size * 3, epsilon=epsilon)
-    su3_pool = np.zeros((pool_size, su3, su3), complex)
+    su3_pool = np.zeros((pool_size, su3, su3), dtype=np.complex128)
 
     for i in range(round(pool_size / 2)):  # half pool RST and half RST. conj.T
         r = su2_pool[i]
@@ -46,7 +59,7 @@ def SU2SingleMatrix():
     # SU2Matrix = np.empty((2, 2)) + 0j
 
     r0 = np.random.uniform(-0.5, 0.5)
-    x0 = np.sign(r0) * np.sqrt(1 - epsilon ** 2)
+    x0 = np.sign(r0) * np.sqrt(1 - epsilon**2)
 
     r = np.random.random((3)) - 0.5
     x = epsilon * r / np.linalg.norm(r)
@@ -108,34 +121,38 @@ def SU3SingleMatrix():
     return SU3Matrix
 
 
-def initialize_lattice(start, N):
+def initialize_lattice(start):
 
     """Name says"""
 
-    U = np.zeros((N, N, N, N, 4, su3, su3), complex)
+    U = np.zeros((Ns, Ns, Ns, Nt, 4, su3, su3), dtype=np.complex128)
     su3_pool = SU3_pool_generator(pool_size=pool_size)
 
-    for t in range(N):
-        for x in range(N):
-            for y in range(N):
-                for z in range(N):
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+                for t in range(Nt):
                     for mu in range(4):
                         if start == 0:
-                            U[t, x, y, z, mu] = np.identity(su3)
+                            U[x, y, z, t, mu] = np.identity(su3)
                         if start == 1:
-                            U[t, x, y, z, mu] = su3_pool[
+                            U[x, y, z, t, mu] = su3_pool[
                                 np.random.randint(0, pool_size)
                             ]
     return U
 
 
 @njit()
-def staple_calculus(t, x, y, z, mu, U):
+def staple_calculus(x, y, z, t, mu, U):
 
     """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
     # staple_start = np.zeros((su3, su3), complex)
     staple_start = np.array(
-        ((0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j),)
+        (
+            (0 + 0j, 0 + 0j, 0 + 0j),
+            (0 + 0j, 0 + 0j, 0 + 0j),
+            (0 + 0j, 0 + 0j, 0 + 0j),
+        )
     )
     # staple_start = np.empty((3, 3)) + 0j
 
@@ -153,197 +170,48 @@ def staple_calculus(t, x, y, z, mu, U):
             # product of 6 matrices
             staple_start += (
                 U[
-                    (t + a_mu[0]) % N,
-                    (x + a_mu[1]) % N,
-                    (y + a_mu[2]) % N,
-                    (z + a_mu[3]) % N,
+                    (x + a_mu[0]) % Ns,
+                    (y + a_mu[1]) % Ns,
+                    (z + a_mu[2]) % Ns,
+                    (t + a_mu[3]) % Nt,
                     nu,
                 ]
                 @ U[
-                    (t + a_nu[0]) % N,
-                    (x + a_nu[1]) % N,
-                    (y + a_nu[2]) % N,
-                    (z + a_nu[3]) % N,
+                    (x + a_nu[0]) % Ns,
+                    (y + a_nu[1]) % Ns,
+                    (z + a_nu[2]) % Ns,
+                    (t + a_nu[3]) % Nt,
                     mu,
                 ]
                 .conj()
                 .T
-                @ U[t, x, y, z, nu].conj().T
+                @ U[x, y, z, t, nu].conj().T
             )
 
             staple_start += (
                 U[
-                    (t + a_mu[0] - a_nu[0]) % N,
-                    (x + a_mu[1] - a_nu[1]) % N,
-                    (y + a_mu[2] - a_nu[2]) % N,
-                    (z + a_mu[3] - a_nu[3]) % N,
+                    (x + a_mu[0] - a_nu[0]) % Ns,
+                    (y + a_mu[1] - a_nu[1]) % Ns,
+                    (z + a_mu[2] - a_nu[2]) % Ns,
+                    (t + a_mu[3] - a_nu[3]) % Nt,
                     nu,
                 ]
                 .conj()
                 .T
                 @ U[
-                    (t - a_nu[0]) % N,
-                    (x - a_nu[1]) % N,
-                    (y - a_nu[2]) % N,
-                    (z - a_nu[3]) % N,
+                    (x - a_nu[0]) % Ns,
+                    (y - a_nu[1]) % Ns,
+                    (z - a_nu[2]) % Ns,
+                    (t - a_nu[3]) % Nt,
                     mu,
                 ]
                 .conj()
                 .T
                 @ U[
-                    (t - a_nu[0]) % N,
-                    (x - a_nu[1]) % N,
-                    (y - a_nu[2]) % N,
-                    (z - a_nu[3]) % N,
-                    nu,
-                ]
-            )
-            # nu += 1
-        else:
-            continue
-
-    return staple_start
-
-
-@njit()
-def staple_calculusProvaScema(t, x, y, z, mu, U):
-
-    """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
-    # staple_start = np.zeros((su3, su3), complex)
-    staple_start = np.array(
-        ((0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j),)
-    )
-    # staple_start = np.empty((3, 3)) + 0j
-
-    a_mu = [0, 0, 0, 0]
-    a_mu[mu] = 1
-
-    for nu in range(mu + 1, 4):
-
-        # nu = 0
-        # while nu < mu:
-        a_nu = [0, 0, 0, 0]
-        a_nu[nu] = 1
-
-        # product of 6 matrices
-        staple_start += (
-            U[
-                (t + a_mu[0]) % N,
-                (x + a_mu[1]) % N,
-                (y + a_mu[2]) % N,
-                (z + a_mu[3]) % N,
-                nu,
-            ]
-            @ U[
-                (t + a_nu[0]) % N,
-                (x + a_nu[1]) % N,
-                (y + a_nu[2]) % N,
-                (z + a_nu[3]) % N,
-                mu,
-            ]
-            .conj()
-            .T
-            @ U[t, x, y, z, nu].conj().T
-        )
-
-        staple_start += (
-            U[
-                (t + a_mu[0] - a_nu[0]) % N,
-                (x + a_mu[1] - a_nu[1]) % N,
-                (y + a_mu[2] - a_nu[2]) % N,
-                (z + a_mu[3] - a_nu[3]) % N,
-                nu,
-            ]
-            .conj()
-            .T
-            @ U[
-                (t - a_nu[0]) % N,
-                (x - a_nu[1]) % N,
-                (y - a_nu[2]) % N,
-                (z - a_nu[3]) % N,
-                mu,
-            ]
-            .conj()
-            .T
-            @ U[
-                (t - a_nu[0]) % N,
-                (x - a_nu[1]) % N,
-                (y - a_nu[2]) % N,
-                (z - a_nu[3]) % N,
-                nu,
-            ]
-        )
-        # nu += 1
-
-    return staple_start
-
-
-@njit()
-def staple_calculus(t, x, y, z, mu, U):
-
-    """Calculate the contribution (interaction) of the three links sorrounding the link that we want to update"""
-    # staple_start = np.zeros((su3, su3), complex)
-    staple_start = np.array(
-        ((0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j), (0 + 0j, 0 + 0j, 0 + 0j),)
-    )
-    # staple_start = np.empty((3, 3)) + 0j
-
-    a_mu = [0, 0, 0, 0]
-    a_mu[mu] = 1
-
-    for nu in range(4):
-
-        if mu != nu:
-            # nu = 0
-            # while nu < mu:
-            a_nu = [0, 0, 0, 0]
-            a_nu[nu] = 1
-
-            # product of 6 matrices
-            staple_start += (
-                U[
-                    (t + a_mu[0]) % N,
-                    (x + a_mu[1]) % N,
-                    (y + a_mu[2]) % N,
-                    (z + a_mu[3]) % N,
-                    nu,
-                ]
-                @ U[
-                    (t + a_nu[0]) % N,
-                    (x + a_nu[1]) % N,
-                    (y + a_nu[2]) % N,
-                    (z + a_nu[3]) % N,
-                    mu,
-                ]
-                .conj()
-                .T
-                @ U[t, x, y, z, nu].conj().T
-            )
-
-            staple_start += (
-                U[
-                    (t + a_mu[0] - a_nu[0]) % N,
-                    (x + a_mu[1] - a_nu[1]) % N,
-                    (y + a_mu[2] - a_nu[2]) % N,
-                    (z + a_mu[3] - a_nu[3]) % N,
-                    nu,
-                ]
-                .conj()
-                .T
-                @ U[
-                    (t - a_nu[0]) % N,
-                    (x - a_nu[1]) % N,
-                    (y - a_nu[2]) % N,
-                    (z - a_nu[3]) % N,
-                    mu,
-                ]
-                .conj()
-                .T
-                @ U[
-                    (t - a_nu[0]) % N,
-                    (x - a_nu[1]) % N,
-                    (y - a_nu[2]) % N,
-                    (z - a_nu[3]) % N,
+                    (x - a_nu[0]) % Ns,
+                    (y - a_nu[1]) % Ns,
+                    (z - a_nu[2]) % Ns,
+                    (t - a_nu[3]) % Nt,
                     nu,
                 ]
             )
@@ -370,8 +238,8 @@ def initialize_staple(staple_start):
 def reflectionSU3(U, reflection):
 
     """This function reflects the off-diagonal element of the matrix for the Over Relaxation algorithm
-        Any of the below reflection operations leads to the definition of a new group element having the 
-        same energy of the original one. The reflection can be selected randomly"""
+    Any of the below reflection operations leads to the definition of a new group element having the
+    same energy of the original one. The reflection can be selected randomly"""
 
     if reflection == 1:
         U[0, 1] = -U[0, 1]
@@ -514,7 +382,7 @@ def sample_HB_SU2(su2matrix, beta):
     a2 = np.random.uniform(-1, 1)
     a3 = np.random.uniform(-1, 1)
 
-    while np.sqrt((a1 ** 2 + a2 ** 2 + a3 ** 2)) > 1:
+    while np.sqrt((a1**2 + a2**2 + a3**2)) > 1:
 
         a1 = 1 - np.random.uniform(-1, 1)
         a2 = 1 - np.random.uniform(-1, 1)
@@ -558,11 +426,11 @@ def sampleA(a, beta):
     xtrial = np.random.uniform(0, 1) * (1 - w) + w
     a0 = 1 + np.log(xtrial) / (beta * a)
 
-    while np.sqrt(1 - a0 ** 2) < np.random.uniform(0, 1):
+    while np.sqrt(1 - a0**2) < np.random.uniform(0, 1):
         xtrial = np.random.uniform(0, 1) * (1 - w) + w
         a0 = 1 + np.log(xtrial) / (beta * a)
 
-    r = np.sqrt(1 - a0 ** 2)
+    r = np.sqrt(1 - a0**2)
     a1 = np.random.normal()
     a2 = np.random.normal()
     a3 = np.random.normal()
@@ -572,7 +440,7 @@ def sampleA(a, beta):
     #     a2 = np.random.normal()
     #     a3 = np.random.normal()
 
-    norm = np.sqrt(a1 ** 2 + a2 ** 2 + a3 ** 2)
+    norm = np.sqrt(a1**2 + a2**2 + a3**2)
 
     a1 = a1 * r / norm
     a2 = a2 * r / norm
@@ -628,98 +496,9 @@ def PeriodicBC(U, t, x, y, z, N):
     return U[t, x, y, z]
 
 
-# #@njit()
-def S(I, J, U):
-
-    """Construct the Wilson Action, but should be recontrolled. For now you should refer to the method WilsonAction"""
-
-    # !!!!!!!!!!!  WARNING  !!!!!!!!!!
-    somma = 0
-    for t in range(N):
-        for x in range(N):
-            for y in range(N):
-                for z in range(N):
-
-                    U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
-                    for nu in range(4):
-
-                        a_nu = [0, 0, 0, 0]
-                        a_nu[nu] = 1
-
-                        mu = 0
-                        while mu < nu:
-
-                            a_mu = [0, 0, 0, 0]
-                            a_mu[mu] = 1
-
-                            ii = 0
-                            jj = 0
-
-                            temp = np.identity(su3) + 0j
-
-                            for ii in range(0, I):
-                                temp = np.dot(
-                                    temp,
-                                    U[
-                                        (t + ii * a_mu[0]) % N,
-                                        (x + ii * a_mu[1]) % N,
-                                        (y + ii * a_mu[2]) % N,
-                                        (z + ii * a_mu[3]) % N,
-                                        mu,
-                                    ],
-                                )
-
-                            for jj in range(0, J):
-                                temp = np.dot(
-                                    temp,
-                                    U[
-                                        (t + (ii + 1) * a_mu[0] + jj * a_nu[0]) % N,
-                                        (x + (ii + 1) * a_mu[1] + jj * a_nu[1]) % N,
-                                        (y + (ii + 1) * a_mu[2] + ii * a_nu[2]) % N,
-                                        (z + (ii + 1) * a_mu[3] + jj * a_nu[3]) % N,
-                                        nu,
-                                    ],
-                                )
-
-                            for ii in range(ii, -1, -1):
-
-                                temp = np.dot(
-                                    temp,
-                                    U[
-                                        (t + ii * a_mu[0] + (jj + 1) * a_nu[0]) % N,
-                                        (x + ii * a_mu[1] + (jj + 1) * a_nu[1]) % N,
-                                        (y + ii * a_mu[2] + (jj + 1) * a_nu[2]) % N,
-                                        (z + ii * a_mu[3] + (jj + 1) * a_nu[3]) % N,
-                                        mu,
-                                    ]
-                                    .conj()
-                                    .T,
-                                )
-
-                            for jj in range(jj, -1, -1):
-
-                                temp = np.dot(
-                                    temp,
-                                    U[
-                                        (t + jj * a_nu[0]) % N,
-                                        (x + jj * a_nu[1]) % N,
-                                        (y + jj * a_nu[2]) % N,
-                                        (z + jj * a_nu[3]) % N,
-                                        nu,
-                                    ]
-                                    .conj()
-                                    .T,
-                                )
-
-                            somma += (np.trace(temp)).real / su3
-                            mu += 1
-
-    return somma / (6 * N ** 4)
-
-
 # U = initialize_lattice(1, 5)
 # gramschmidt2puntozero(U[0, 0, 0, 1, 1])
 
 if __name__ == "__main__":
-    su3 = SU3SingleMatrix()
-    print(su3)
+    U = initialize_lattice(1)
+    print(U.shape)

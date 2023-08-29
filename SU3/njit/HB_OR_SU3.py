@@ -1,3 +1,6 @@
+import multiprocessing
+import os
+import shutil
 import numpy as np
 import matplotlib.pyplot as plt
 from numba import njit, jit, float64, int64
@@ -7,26 +10,47 @@ from algebra import *
 from functions import *
 import parameters as par
 
+import warnings
+from numba.core.errors import NumbaPerformanceWarning
+
+# Disable the performance warning
+warnings.simplefilter("ignore", category=NumbaPerformanceWarning)
+
 su3 = par.su3
 su2 = par.su2
+Ns = par.Ns
+Nt = par.Nt
 epsilon = par.epsilon
-N = par.N
+# N = par.N
 pool_size = par.pool_size
+N_conf = par.N_conf
+measures = N_conf
+beta_vec = par.beta_vec
 
-sx = np.array(((0, 1), (1, 0)), complex)
-sy = np.array(((0, -1j), (1j, 0)), complex)
-sz = np.array(((1, 0), (0, -1)), complex)
+# What kind of update do u want, bitch?
+overrelax = False
+metropolis = False
+heatbath = True
+
+
+# Wilson Loop extension
+R = par.R
+T = par.T
+
+sx = np.array(((0, 1), (1, 0)), dtype=np.complex128)
+sy = np.array(((0, -1j), (1j, 0)), dtype=np.complex128)
+sz = np.array(((1, 0), (0, -1)), dtype=np.complex128)
 
 #
 @njit()
-def HB_updating_links(beta, U, N):
+def HB_updating_links(beta, U):
 
     """Update each link via the heatbath algorithm"""
 
-    for t in range(N):
-        for x in range(N):
-            for y in range(N):
-                for z in range(N):
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+                for t in range(Nt):
 
                     # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
 
@@ -36,11 +60,11 @@ def HB_updating_links(beta, U, N):
                         # in modo da estrarre R dall'heatbath di W=UA,
                         # S dall'heathbath di W=RUA e T dall'heathbath di W=SRUA
 
-                        Utemp = U[t, x, y, z, mu]
+                        Utemp = U[x, y, z, t, mu]
 
                         # staple must be initialized for each calculus
 
-                        A = staple_calculus(t, x, y, z, mu, U)
+                        A = staple_calculus(x, y, z, t, mu, U)
                         W = np.dot(Utemp, A)
 
                         a = det_calculus(W)
@@ -80,106 +104,42 @@ def HB_updating_links(beta, U, N):
                             )
                             # U'=TSRU
                             Uprime = T @ S @ R @ Utemp
-                            U[t, x, y, z, mu] = Uprime
+                            U[x, y, z, t, mu] = Uprime
 
                         else:
-                            U[t, x, y, z, mu] = SU3SingleMatrix()
+                            U[x, y, z, t, mu] = SU3SingleMatrix()
 
     return U
 
 
 @njit()
-def OverRelaxation_update(U, N):
+def OverRelaxation_(U):
 
     """Ettore Vicari, An overrelaxed Monte Carlo algorithm
-        for SU(3) lattice gauge theories"""
+    for SU(3) lattice gauge theories"""
 
-    # I don't know if it works good!
+    # Funziona benissimo bitches!!!
 
-    for t in range(N):
-        for x in range(N):
-            for y in range(N):
-                for z in range(N):
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+                for t in range(Nt):
 
                     # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
 
                     for mu in range(4):
 
-                        Utemp = U[t, x, y, z, mu]
+                        Utemp = U[x, y, z, t, mu]
 
-                        A = staple_calculus(t, x, y, z, mu, U)
-                        a = np.sqrt((np.linalg.det(A)))
-
-                        if a != 0:
-
-                            # A = A / a
-                            Adagger = A.conj().T
-                            H = np.sqrt(Adagger @ A)
-                            O = A @ (1 / H)
-                            O = GramSchmidt(O, True)
-
-                            det_O = np.linalg.det(O.conj().T).real
-
-                            if (det_O) != 0:
-
-                                V = diagonalization(H)
-
-                                Uprime = V @ Utemp @ O @ V.conj().T
-
-                                reflection = np.random.randint(1, 4)
-
-                                Uprime = reflectionSU3(Uprime, reflection)
-
-                                Ufinal = V.conj().T @ Uprime @ V @ O.conj().T
-
-                                # Ufinal = GramSchmidt(Ufinal, exe=True)
-                                detU = np.linalg.det(Ufinal).real
-
-                                if round(detU) == 1:
-                                    I_alpha = (np.identity(su3) + 0j) * (1)
-                                    Ufinal = np.dot(Ufinal, I_alpha)
-
-                                if round(detU) == -1:
-                                    I_alpha = (np.identity(su3) + 0j) * (-1)
-                                    Ufinal = np.dot(Ufinal, I_alpha)
-
-                                U[t, x, y, z, mu] = Ufinal
-                        else:
-                            U[t, x, y, z, mu] = SU3SingleMatrix()
-
-    return U
-
-
-@njit()
-def OverRelaxation_(U, N):
-
-    """Ettore Vicari, An overrelaxed Monte Carlo algorithm
-        for SU(3) lattice gauge theories"""
-
-    # I don't know if it works good!
-
-    for t in range(N):
-        for x in range(N):
-            for y in range(N):
-                for z in range(N):
-
-                    # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
-
-                    for mu in range(4):
-
-                        Utemp = U[t, x, y, z, mu]
-
-                        A = staple_calculus(t, x, y, z, mu, U)
+                        A = staple_calculus(x, y, z, t, mu, U)
                         a = np.sqrt(np.linalg.det(A))
                         A = A / a
-                        # print("dettofatto", np.linalg.det(A))
                         Adagger = A.conj().T
 
                         Atemp = Adagger @ A
                         H = matrixsqrt(Atemp)  # H is Hermitean matrix, controlled
 
-                        O = A @ (1 / H)  # @ invMatrix(H)
-                        # O = np.divide(A, H)
+                        O = A @ np.linalg.inv(H)
                         det_O = np.linalg.det(O)
 
                         if round(det_O.real) == 1:
@@ -193,15 +153,11 @@ def OverRelaxation_(U, N):
                             O = np.dot(O, I_alpha)
 
                         V = diagonalization(H)
-                        # Uprime = V @ Utemp @ Otilde @ V.conj().T
-                        # Uprime = reflectionSU3(Uprime, np.random.randint(0, 4))
 
                         Urefl = V @ Utemp @ O @ V.conj().T
                         Urefl = reflectionSU3(Urefl, np.random.randint(0, 4))
                         Uprime = V.conj().T @ Urefl @ V @ O.conj().T
-
-                        # print(np.linalg.det(Uprime))
-                        U[t, x, y, z, mu] = Uprime
+                        U[x, y, z, t, mu] = Uprime
     return U
 
 
@@ -224,7 +180,7 @@ def invMatrix(M):
 @njit()
 def heatbath_SU3(W, beta, subgrp, kind=1):
 
-    """Execute Heat Bath on each of three submatrices of SU(3) (R, S; and T) through the quaternion representation. HB 
+    """Execute Heat Bath on each of three submatrices of SU(3) (R, S; and T) through the quaternion representation. HB
     extracts the SU(2) matrix directly from the distribution that leaves the Haar measure invariant"""
 
     if subgrp == "R":
@@ -297,10 +253,10 @@ def WilsonAction(R, T, U):
     """Name says"""
 
     somma = 0
-    for t in range(N):
-        for x in range(N):
-            for y in range(N):
-                for z in range(N):
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+                for t in range(Nt):
 
                     # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
 
@@ -326,10 +282,10 @@ def WilsonAction(R, T, U):
                                 loop = np.dot(
                                     loop,
                                     U[
-                                        (t + i * a_mu[0]) % N,
-                                        (x + i * a_mu[1]) % N,
-                                        (y + i * a_mu[2]) % N,
-                                        (z + i * a_mu[3]) % N,
+                                        (x + i * a_mu[0]) % Ns,
+                                        (y + i * a_mu[1]) % Ns,
+                                        (z + i * a_mu[2]) % Ns,
+                                        (t + i * a_mu[3]) % Nt,
                                         mu,
                                     ],
                                 )
@@ -338,10 +294,10 @@ def WilsonAction(R, T, U):
                                 loop = np.dot(
                                     loop,
                                     U[
-                                        (t + T * a_mu[0] + j * a_nu[0]) % N,
-                                        (x + T * a_mu[1] + j * a_nu[1]) % N,
-                                        (y + T * a_mu[2] + j * a_nu[2]) % N,
-                                        (z + T * a_mu[3] + j * a_nu[3]) % N,
+                                        (x + T * a_mu[0] + j * a_nu[0]) % Ns,
+                                        (y + T * a_mu[1] + j * a_nu[1]) % Ns,
+                                        (z + T * a_mu[2] + j * a_nu[2]) % Ns,
+                                        (t + T * a_mu[3] + j * a_nu[3]) % Nt,
                                         nu,
                                     ],
                                 )
@@ -353,10 +309,10 @@ def WilsonAction(R, T, U):
                                 loop = np.dot(
                                     loop,
                                     U[
-                                        (t + i * a_mu[0] + R * a_nu[0]) % N,
-                                        (x + i * a_mu[1] + R * a_nu[1]) % N,
-                                        (y + i * a_mu[2] + R * a_nu[2]) % N,
-                                        (z + i * a_mu[3] + R * a_nu[3]) % N,
+                                        (x + i * a_mu[0] + R * a_nu[0]) % Ns,
+                                        (y + i * a_mu[1] + R * a_nu[1]) % Ns,
+                                        (z + i * a_mu[2] + R * a_nu[2]) % Ns,
+                                        (t + i * a_mu[3] + R * a_nu[3]) % Nt,
                                         mu,
                                     ]
                                     .conj()
@@ -367,10 +323,10 @@ def WilsonAction(R, T, U):
                                 loop = np.dot(
                                     loop,
                                     U[
-                                        (t + j * a_nu[0]) % N,
-                                        (x + j * a_nu[1]) % N,
-                                        (y + j * a_nu[2]) % N,
-                                        (z + j * a_nu[3]) % N,
+                                        (z + j * a_nu[0]) % Ns,
+                                        (y + j * a_nu[1]) % Ns,
+                                        (z + j * a_nu[2]) % Ns,
+                                        (t + j * a_nu[3]) % Nt,
                                         nu,
                                     ]
                                     .conj()
@@ -379,7 +335,7 @@ def WilsonAction(R, T, U):
 
                             somma += np.trace(loop).real / su3
 
-    return somma / (6 * N ** 4)
+    return somma / (6 * Ns**3 * Nt)
 
 
 @njit()
@@ -394,17 +350,17 @@ def Metropolis(U, beta, hits):
 
     """Execution of Metropolis, checking every single site 10 times."""
 
-    for t in range(N):
-        for x in range(N):
-            for y in range(N):
-                for z in range(N):
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+                for t in range(Nt):
                     for mu in range(4):
 
-                        staple = staple_calculus(t, x, y, z, mu, U)
+                        staple = staple_calculus(x, y, z, t, mu, U)
 
                         for _ in range(hits):
 
-                            old_link = U[t, x, y, z, mu].copy()
+                            old_link = U[x, y, z, t, mu].copy()
                             S_old = calculate_S(old_link, staple, beta)
 
                             su3matrix = SU3SingleMatrix()
@@ -413,12 +369,12 @@ def Metropolis(U, beta, hits):
                             dS = S_new - S_old
 
                             if dS < 0:
-                                U[t, x, y, z, mu] = new_link
+                                U[x, y, z, t, mu] = new_link
                             else:
                                 if np.exp(-dS) > np.random.uniform(0, 1):
-                                    U[t, x, y, z, mu] = new_link
+                                    U[x, y, z, t, mu] = new_link
                                 else:
-                                    U[t, x, y, z, mu] = old_link
+                                    U[x, y, z, t, mu] = old_link
     return U
 
 
@@ -430,77 +386,113 @@ def diagonalization(Matrix):
     return V
 
 
+def main(beth):
+
+    U = initialize_lattice(1)
+    print("Shape of my heart is a song by Sting", U.shape)
+    print("exe for beta = ", beth)
+    obs = []
+    obs2 = []
+    obs3 = []
+
+    for _ in range(measures):
+
+        if heatbath:
+            U = HB_updating_links(beth, U)
+
+        if metropolis:
+            U = Metropolis(U, beth, hits=10)
+
+        if overrelax:
+            for _ in range(1):
+                U = OverRelaxation_(U)
+
+        # two different wilson loops
+        temp = WilsonAction(R, T, U)
+
+        temp2 = WilsonAction(3, 3, U)
+        temp3 = WilsonAction(2, 2, U)
+
+        print("wilson_11 action", temp)
+
+        obs.append(temp)
+        obs2.append(temp2)
+        obs3.append(temp3)
+
+    W11 = np.mean(obs)
+    W22 = np.mean(obs3)
+    W33 = np.mean(obs2)
+
+    return W11, W22, W33
+
+
+def checkPath(pathlista):
+
+    for p in pathlista:
+        p = str(p)
+        print("path ", p)
+        if os.path.exists(p) == False:
+            os.makedirs(p)
+        else:
+            shutil.rmtree(p)
+            os.makedirs(p)
+
+
 if __name__ == "__main__":
 
     import time
 
-    measures = 20
-    idecorrel = par.idecorrel
+    execution = True
+    path = "data/Wilson_loop/"  # change this path to your own
 
-    R = 1
-    T = 1
-    beta_vec = (np.linspace(0.1, 10, 20)).tolist()
-    U = initialize_lattice(1, N)
+    if execution:
+        print("Update with:")
+        if heatbath:
+            print("heabath")
+        if overrelax:
+            print("OR")
+        if metropolis:
+            print("Metro")
 
-    # which kind of link update would you like to use?
-    overrelax = True
-    metropolis = False
-    heatbath = False
+        idecorrel = par.idecorrel
+        # which kind of link update would you like to use?
 
-    Smean = []
-    Smean2 = []
+        checkPath(path)
 
-    staple_start = np.zeros((su3, su3), complex)
-    quat = np.zeros((su2, su2), complex)
+        Smean = []
+        Smean2 = []
+        Smean3 = []
 
-    start = time.time()
+        staple_start = np.zeros((su3, su3), dtype=np.complex128)
+        quat = np.zeros((su2, su2), dtype=np.complex128)
 
-    for beth in beta_vec:
+        start = time.time()
 
-        print(
-            "exe for beta = ",
-            round(beth, 2),
-            "step",
-            beta_vec.index(beth),
-            "/",
-            len(beta_vec),
-        )
-        obs = []
-        obsame = []
+        with multiprocessing.Pool(processes=len(beta_vec)) as pool:
+            results = pool.map(main, beta_vec)
+            for result in results:
+                Smean.append(result[0])
+                Smean2.append(result[1])
+                Smean3.append(result[2])
 
-        for _ in range(measures):
+            pool.close()
+            pool.join()
 
-            if heatbath:
-                U = HB_updating_links(beth, U, N)
+        np.savetxt(f"{path}/mean_action_L_{Ns}_W11.txt", Smean)
+        np.savetxt(f"{path}/mean_action_L_{Ns}_W22.txt", Smean3)
+        np.savetxt(f"{path}/mean_action_L_{Ns}_W33.txt", Smean2)
 
-            if metropolis:
-                U = Metropolis(U, beth, hits=10)
+        print(f"Execution time: {round(time.time() - start, 2)} s")
+        W11 = np.loadtxt(f"{path}/mean_action_L_{Ns}_W11.txt")
+        W22 = np.loadtxt(f"{path}/mean_action_L_{Ns}_W22.txt")
+        W33 = np.loadtxt(f"{path}/mean_action_L_{Ns}_W33.txt")
 
-            if overrelax:
-                for _ in range(1):
-                    U = OverRelaxation_(U, N)
-
-            # two different wilson loops
-            temp = WilsonAction(R, T, U)
-            temp2 = WilsonAction(3, 3, U)
-
-            print(temp)
-
-            obs.append(temp)
-            obsame.append(temp2)
-        Smean.append(np.mean(obs))
-        Smean2.append(np.mean(obsame))
-
-    print(f"Execution time: {round(time.time() - start, 2)} s")
-    plt.figure()
-    plt.title(
-        f"Average action for N = {N}, measures = {measures} for beta in [{min(beta_vec)},{max(beta_vec)}]",
-        fontsize=17,
-    )
-    plt.plot(beta_vec, Smean, "go")
-    plt.plot(beta_vec, Smean2, "bo")
-    plt.xlabel(r"$\beta$", fontsize=15)
-    plt.ylabel(r"<$S_{W_{11}}$>", fontsize=15)
-    plt.legend(["W11", "W22"])
-    plt.show()
-
+        plt.figure()
+        plt.title(" SU(3) Wilson loop for N = 6", fontsize=18)
+        plt.scatter(beta_vec, Smean, s=3, c="r", label=r"$W_{11}$")
+        plt.scatter(beta_vec, Smean2, s=3, c="b", label=r"$W_{22}$")
+        plt.scatter(beta_vec, Smean3, s=3, c="g", label=r"$W_{33}$")
+        plt.xlabel(r"$\beta$", fontsize=16)
+        plt.ylabel(r"$\langle W_{R,T} \rangle$ ", fontsize=16)
+        plt.legend()
+        plt.show()
