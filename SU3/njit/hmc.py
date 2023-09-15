@@ -13,6 +13,22 @@ from numba import njit, float64, int64, complex128, boolean
 ref.:
 [1] Bonati, D'Elia: Comparison of the gradient flow with cooling in SU(3) pure gauge theory
 
+references:
+[1] S. Schaefer, R. Sommer, and F. Virotta, “Critical slowing down and error analysis in lattice QCD simulations,” Nucl. Phys. B, vol. 845, no. 1, pp. 93–114, 2011.   
+[2] M. Lüscher, “Topology, the Wilson flow and the HMC algorithm,” PoS, vol. LATTICE2013, p. 016, 2014.
+[3] M. Lüscher, “Properties and uses of the Wilson flow in lattice QCD,” JHEP, vol. 08, p. 071, 2010.
+[4] R. Gupta et al "Comparison of Update Algorithms for Pure Gauge SU(3)", http://cds.cern.ch/record/186962/files/CM-P00052019.pdf
+[5] Kennedy, Pendleton "ACCEPTANCES AND AUTOCORRELATIONS IN HYBRID MONTE CARLO
+[6] https://arxiv.org/abs/hep-lat/0502007v3"
+
+alcune regole:
+1. nelle funzioni se c'è U viene prima di tutti gli altri argomenti
+2. ordine generale (U, P, beta, x, y, z, t, mu):
+
+
+NOTA IMPORTANTE: njit(argomentooutput(argomentiinput), fastmath =True) funziona velocissimo
+ma le funzioni devono essere strutturate per cacare solo 1 argomento alla volta
+deltaH must be of order O(dtau^2) [6]
 """
 
 
@@ -263,6 +279,7 @@ if __name__ == "__main__":
     test = 2
 
     if test == 1:
+        """compare with Heat-Bath withouth Metropolis test"""
         Wilsons = []
         Uhb = U.copy()
         Uhmc = U.copy()
@@ -291,6 +308,8 @@ if __name__ == "__main__":
             print("Wilsonhmc = ", Wilsonhmc)
 
     elif test == 2:
+        """HMC with multiprocessing. Plot the mean of the Wilson action
+        as a function of beta"""
 
         with multiprocessing.Pool(processes=len(beta_vec)) as pool:
             temp = partial(HMC_definitivo_siSpera, U)
