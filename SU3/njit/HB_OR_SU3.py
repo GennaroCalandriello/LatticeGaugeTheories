@@ -3,7 +3,8 @@ import os
 import shutil
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import njit, jit, float64, int64
+from numba import njit, jit, float64, int64, complex128, prange
+from regex import P
 
 from randomSU2 import *
 from algebra import *
@@ -443,7 +444,7 @@ if __name__ == "__main__":
     import time
 
     execution = True
-    path = "data/Wilson_loop/"  # change this path to your own
+    path = "njit/datafiles/Wilson_loop/"  # change this path to your own
 
     if execution:
         print("Update with:")
@@ -457,7 +458,7 @@ if __name__ == "__main__":
         idecorrel = par.idecorrel
         # which kind of link update would you like to use?
 
-        checkPath(path)
+        checkPath([path])
 
         Smean = []
         Smean2 = []

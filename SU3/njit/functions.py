@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit, float64, int64
+from numba import njit, float64, int64, complex128
 
 from algebra import *
 from randomSU2 import *
@@ -27,6 +27,56 @@ pool_size = par.pool_size
 sx = np.array(((0, 1), (1, 0)), dtype=np.complex128)
 sy = np.array(((0, -1j), (1j, 0)), dtype=np.complex128)
 sz = np.array(((1, 0), (0, -1)), dtype=np.complex128)
+
+####-------------------Initialize configuration------------------------------
+def another_initializeLattice():
+    """Initialize the lattice with random SU(3) matrices using U =exp(iQ)"""
+
+    import scipy.linalg as la
+
+    U = np.zeros((Ns, Ns, Ns, Nt, 4, 3, 3), dtype=np.complex128)
+
+    def random_su3_matrix():
+        omega = np.random.normal(0, 1 / np.sqrt(2), 8)
+        # omega = np.random.uniform(0, 1 / np.sqrt(2), size=8)
+        hermitian_matrix = np.zeros((3, 3), dtype=np.complex128)
+
+        for i in range(1, 9):
+            hermitian_matrix += omega[i - 1] * Tgen(i)
+        return la.expm(1j * hermitian_matrix)
+
+    # Populate U
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+                for t in range(Nt):
+                    for mu in range(4):
+                        U[x, y, z, t, mu] = random_su3_matrix()
+    return U
+
+
+def initialize_lattice(start):
+
+    """Name says"""
+
+    U = np.zeros((Ns, Ns, Ns, Nt, 4, su3, su3), dtype=np.complex128)
+    su3_pool = SU3_pool_generator(pool_size=pool_size)
+
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+                for t in range(Nt):
+                    for mu in range(4):
+                        if start == 0:
+                            U[x, y, z, t, mu] = np.identity(su3)
+                        if start == 1:
+                            U[x, y, z, t, mu] = su3_pool[
+                                np.random.randint(0, pool_size)
+                            ]
+    return U
+
+
+# --------------------------------------------------------------------------------------------------------
 
 
 def SU3_pool_generator(pool_size):
@@ -121,25 +171,137 @@ def SU3SingleMatrix():
     return SU3Matrix
 
 
-def initialize_lattice(start):
+@njit(
+    complex128[:, :](
+        int64, int64, int64, int64, int64, complex128[:, :, :, :, :, :, :]
+    ),
+    fastmath=True,
+)
+def staple(x, y, z, t, mu, U):
 
-    """Name says"""
+    """Calculate the contribution (interaction) of the 6 links sorrounding the link that we want to update"""
+    # njit() works well!
 
-    U = np.zeros((Ns, Ns, Ns, Nt, 4, su3, su3), dtype=np.complex128)
-    su3_pool = SU3_pool_generator(pool_size=pool_size)
+    staple_start = np.array(
+        (
+            (0 + 0j, 0 + 0j, 0 + 0j),
+            (0 + 0j, 0 + 0j, 0 + 0j),
+            (0 + 0j, 0 + 0j, 0 + 0j),
+        )
+    )
+    # staple_start = np.empty((3, 3)) + 0j
+
+    a_mu = [0, 0, 0, 0]
+    a_mu[mu] = 1
+
+    for nu in range(4):
+
+        if (
+            nu == 0 or nu != mu
+        ):  # |||||||||||||||WARNING CONTROL EXPERIMENTAL TEST|||||||
+            # nu = 0
+            # while nu < mu:
+            a_nu = [0, 0, 0, 0]
+            a_nu[nu] = 1
+
+            # product of 6 matrices
+            staple_start += (
+                U[
+                    (x + a_mu[0]) % Ns,
+                    (y + a_mu[1]) % Ns,
+                    (z + a_mu[2]) % Ns,
+                    (t + a_mu[3]) % Nt,
+                    nu,
+                ]
+                @ U[
+                    (x + a_nu[0]) % Ns,
+                    (y + a_nu[1]) % Ns,
+                    (z + a_nu[2]) % Ns,
+                    (t + a_nu[3]) % Nt,
+                    mu,
+                ]
+                .conj()
+                .T
+                @ U[x, y, z, t, nu].conj().T
+            )
+
+            staple_start += (
+                U[
+                    (x + a_mu[0] - a_nu[0]) % Ns,
+                    (y + a_mu[1] - a_nu[1]) % Ns,
+                    (z + a_mu[2] - a_nu[2]) % Ns,
+                    (t + a_mu[3] - a_nu[3]) % Nt,
+                    nu,
+                ]
+                .conj()
+                .T
+                @ U[
+                    (x - a_nu[0]) % Ns,
+                    (y - a_nu[1]) % Ns,
+                    (z - a_nu[2]) % Ns,
+                    (t - a_nu[3]) % Nt,
+                    mu,
+                ]
+                .conj()
+                .T
+                @ U[
+                    (x - a_nu[0]) % Ns,
+                    (y - a_nu[1]) % Ns,
+                    (z - a_nu[2]) % Ns,
+                    (t - a_nu[3]) % Nt,
+                    nu,
+                ]
+            )
+            # nu += 1
+
+    return staple_start
+
+
+@njit(complex128[:, :](int64), fastmath=True)
+def Tgen(a):
+    """Generator of su(3) algebra"""
+    # njt() works well!
+    if a == 1:
+        T = np.array((([0, 1, 0]), ([1, 0, 0]), ([0, 0, 0])), dtype=complex128)
+    elif a == 2:
+        T = np.array((([0, -1j, 0]), ([1j, 0, 0]), ([0, 0, 0])), dtype=complex128)
+    elif a == 3:
+        T = np.array((([1, 0, 0]), ([0, -1, 0]), ([0, 0, 0])), dtype=complex128)
+    elif a == 4:
+        T = np.array((([0, 0, 1]), ([0, 0, 0]), ([1, 0, 0])), dtype=complex128)
+    elif a == 5:
+        T = np.array((([0, 0, -1j]), ([0, 0, 0]), ([1j, 0, 0])), dtype=complex128)
+    elif a == 6:
+        T = np.array((([0, 0, 0]), ([0, 0, 1]), ([0, 1, 0])), dtype=complex128)
+    elif a == 7:
+        T = np.array((([0, 0, 0]), ([0, 0, -1j]), ([0, 1j, 0])), dtype=complex128)
+    elif a == 8:
+        T = np.array(
+            (([1, 0, 0]), ([0, 1, 0]), ([0, 0, -2])), dtype=complex128
+        ) / np.sqrt(3)
+    return T / 2
+
+
+@njit(complex128[:, :, :, :, :, :, :](), fastmath=True)
+def initialMomenta():
+    """Initializes momenta with a gaussian distribution
+    ref. [4]"""
+    # njit() works well! velocissimo
+    factor_c = 1  # (Ns**3 * Nt) #decreasing this => decreases the energy fluctiations from configurations
+    P = np.zeros((Ns, Ns, Ns, Nt, 4, 3, 3), dtype=np.complex128)
 
     for x in range(Ns):
         for y in range(Ns):
             for z in range(Ns):
                 for t in range(Nt):
                     for mu in range(4):
-                        if start == 0:
-                            U[x, y, z, t, mu] = np.identity(su3)
-                        if start == 1:
-                            U[x, y, z, t, mu] = su3_pool[
-                                np.random.randint(0, pool_size)
-                            ]
-    return U
+                        rand = np.random.normal(loc=0, scale=1 / np.sqrt(2), size=8)
+                        for a in range(1, 9):
+                            P[x, y, z, t, mu] += factor_c * rand[a - 1] * Tgen(a)
+
+    # it's traceless by construction
+
+    return P
 
 
 @njit()
@@ -496,6 +658,49 @@ def PeriodicBC(U, t, x, y, z, N):
     return U[t, x, y, z]
 
 
+@njit(complex128[:, :](complex128, complex128[:, :]), fastmath=True)
+def expMatrix(idtau, P):
+    method = 2
+
+    if method == 1:
+        M = idtau * P
+        evals, evecs = np.linalg.eig(M)
+        eD = np.diag(np.exp(evals))
+        eM = evecs @ eD @ np.linalg.inv(evecs)
+    if method == 2:
+        # 3x3 identity matrix
+        Id = np.array(((1, 0, 0), (0, 1, 0), (0, 0, 1)), dtype=complex128)
+        # exponential expansion
+        eM = (
+            Id
+            + idtau * P
+            + idtau**2 * P @ P / 2
+            + idtau**3 * P @ P @ P / 6
+            + idtau**4 * P @ P @ P @ P / 24
+            + idtau**5 * P @ P @ P @ P @ P / 120
+        )
+
+    return eM
+
+@njit()
+def ta(mat):
+    """Traceless antihermitian part of a matrix"""
+    rows, cols = mat.shape
+
+    aux = np.copy(mat)
+    trace = 0 + 0j
+    one_by_three = 1 / 3
+
+    for i in range(3):
+        for j in range(3):
+            mat[i][j] = 0.5 * (aux[i][j] - np.conj(aux[j][i]))
+
+    trace = np.trace(mat)
+    trace *= one_by_three
+
+    for i in range(3):
+        mat[i][i] -= trace
+        
 # U = initialize_lattice(1, 5)
 # gramschmidt2puntozero(U[0, 0, 0, 1, 1])
 

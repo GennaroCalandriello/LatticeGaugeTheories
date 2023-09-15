@@ -181,7 +181,7 @@ def StaticQuarkAntiquarkPotential(U, beta):
         print("config ", _)
 
         U = HB_updating_links(beta, U)
-        NsCorr = 1  # Ns
+        NsCorr = Ns  # Ns
 
         U = OverRelaxation_(U)
 
@@ -194,6 +194,7 @@ def StaticQuarkAntiquarkPotential(U, beta):
                     for dx in range(N_s):
                         for dy in range(N_s):
                             for dz in range(N_s):
+                                print("dx, dy, dz", dx, dy, dz)
 
                                 r = np.sqrt(
                                     (x - dx) ** 2 + (y - dy) ** 2 + (z - dz) ** 2
@@ -505,13 +506,13 @@ if __name__ == "__main__":
 
     if staticpotential:
         checkPath([pathStaticPot, pathStaticPotErr])
-
+        beta = 5.9
         U = initialize_lattice(1)
-        U = thermalize(U, 5.2, HB=True, Metro=False, OR=False)
-        StaticQuarkAntiquarkPotential(U, 6.8)
+        # U = thermalize(U, beta, HB=True, Metro=False, OR=True)
+        StaticQuarkAntiquarkPotential(U, beta)
         pass
 
-    v = np.loadtxt(f"{pathStaticPot}/V_beta_{round(6.8, 2)}", dtype=complex)
+    v = np.loadtxt(f"{pathStaticPot}/V_beta_5.9", dtype=complex)
     R = v[:, 0]
     ave = v[:, 1]
     plt.plot(R, ave, "o", color="blue")

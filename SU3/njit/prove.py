@@ -4,9 +4,14 @@ from numba import njit
 import multiprocessing
 from functools import partial
 
+from sympy import comp
+
 from polyakov import *
 from HB_OR_SU3 import *
 from functions import *
+
+path = "njit/datafiles/polyakov/static_potential/error/"
+path1 = "njit/datafiles/polyakov/static_potential/"
 
 
 @njit()
@@ -15,13 +20,10 @@ def WilsonLoop(R, T, U):
     """Name says"""
 
     somma = 0
-    wilson = []
     for x in range(Ns):
         for y in range(Ns):
             for z in range(Ns):
                 for t in range(Nt):
-
-                    loop = np.identity(su3) + 0j
 
                     # U[t, x, y, z] = PeriodicBC(U, t, x, y, z, N)
 
@@ -37,6 +39,7 @@ def WilsonLoop(R, T, U):
                             i = 0
                             j = 0
 
+                            loop = np.identity(su3) + 0j
                             # a_nu = [0, 0, 0, 0]
                             # a_nu[nu] = 1
 
@@ -95,12 +98,10 @@ def WilsonLoop(R, T, U):
                                     .conj()
                                     .T,
                                 )
-                                wilson.append(np.trace(loop))
 
-    wilson = np.array(wilson, dtype=np.complex128)
-    me = np.mean(wilson)
+                            somma += np.trace(loop)
 
-    return me
+    return somma / (Ns**3 * Nt)
 
 
 @njit()
@@ -204,6 +205,7 @@ def WilsonLoopStaticQuarkAntiquarkPotential(beta):
     R_arr = np.linspace(1, Ns, Ns).astype(int)
     V_arr = np.zeros((int(len(R_arr)), N_conf), dtype=np.complex128)
     U = initialize_lattice(1)
+
     for _ in range(thermalization):
         U = HB_updating_links(beta, U)
         print(f"thermalizing... {_}/{thermalization}")
@@ -229,8 +231,8 @@ def WilsonLoopStaticQuarkAntiquarkPotential(beta):
             W = WilsonLoop(R, 1, U)
             V_arr[c, m] = W
             c += 1
-
-    V = -np.log(np.mean(V_arr, axis=1))
+    np.savetxt(f"{path1}/V_Wilson_beta{beta}.txt", V_arr)
+    V = -np.log(np.mean(V_arr[:, 200:], axis=1))
     print(V)
 
     plt.figure()
@@ -296,12 +298,114 @@ def group_data(data):
     return grouped_data
 
 
+########################################################POLYNEW#######################################################
+def compute_polyakov(U):
+    Ns = U.shape[0]
+    Nt = U.shape[3]
+    polyakov_loops = np.zeros((Ns, Ns, Ns), dtype=np.complex128)
+
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+                loop = np.identity(3, dtype=np.complex128)
+                for t in range(Nt):
+                    loop = np.dot(loop, U[x, y, z, t, 3, :, :])
+                polyakov_loops[x, y, z] = np.trace(loop)
+
+    return polyakov_loops
+
+
+def mainLoop():
+
+    U = initialize_lattice(1)
+    beta = 8.7
+    # U = thermalize(U, beta)
+    r_vecs = np.array(uniqueDistance())
+    print(len(r_vecs))
+
+    totalCorrelator = np.zeros((N_conf, len(r_vecs)), dtype=np.complex128)
+
+    for _ in range(N_conf):
+        print("config ", _)
+        U = HB_updating_links(beta, U)
+        U = OverRelaxation_(U)
+        P = compute_polyakov(U)
+
+        correlators = [compute_correlator(P, r_vec) for r_vec in r_vecs]
+        correlators = np.array(correlators)
+
+    corrPlot = []
+    for j in range(Ns):
+        corrPlot.append(-np.log(np.mean(totalCorrelator[:, j])))
+    corrPlot = np.array(corrPlot)
+    print(corrPlot)
+    plt.figure()
+    plt.scatter(range(Ns), corrPlot)
+    plt.show()
+
+
+def uniqueDistance():
+    # Example value; you can change this to fit your case
+
+    # Initialize an empty list to hold the tuples
+    r = []
+
+    # Initialize an empty set to hold the unique distances
+    unique_distances = set()
+
+    for i in range(Ns):
+        for j in range(Ns):
+            for k in range(Ns):
+                # Skip the origin
+                if i == 0 and j == 0 and k == 0:
+                    continue
+
+                # Calculate the distance
+                distance = np.sqrt(i**2 + j**2 + k**2)
+
+                # Check if this distance is unique
+                if distance not in unique_distances:
+                    # Add the distance to the set of unique distances
+                    unique_distances.add(distance)
+
+                    # Add the tuple to the list
+                    r.append((i, j, k))
+    rdist = []
+    for i in range(len(r)):
+        rdist.append(np.sqrt(r[i][0] ** 2 + r[i][1] ** 2 + r[i][2] ** 2))
+
+    print(rdist)
+
+    return r
+
+
+###########################################################sono qua!!!
+
+
+@njit()
+def compute_correlator(polyakov_loops, r_vec):
+
+    Ns = polyakov_loops.shape[0]
+    correlator = 0.0
+
+    for x in range(Ns):
+        for y in range(Ns):
+            for z in range(Ns):
+
+                dx, dy, dz = r_vec
+                correlator += polyakov_loops[x, y, z] * np.conjugate(
+                    polyakov_loops[(x + dx) % Ns, (y + dy) % Ns, (z + dz) % Ns]
+                )
+
+    # Average over the entire lattice
+    correlator /= Ns**3
+    return np.abs(correlator)
+
+
 if __name__ == "__main__":
-    path = "njit/data/polyakov/static_potential/error/"
-    path1 = "njit/data/polyakov/static_potential/"
 
     static1 = False
-    static2 = True
+    static2 = False
 
     if static1:
         checkPath(path1)
@@ -326,4 +430,7 @@ if __name__ == "__main__":
 
     if static2:
 
-        WilsonLoopStaticQuarkAntiquarkPotential(5.9)
+        WilsonLoopStaticQuarkAntiquarkPotential(4.5)
+
+    mainLoop()
+    uniqueDistance()
