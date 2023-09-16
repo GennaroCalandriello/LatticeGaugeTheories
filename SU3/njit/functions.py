@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit, float64, int64, complex128
+from numba import njit, float64, int64, complex128, boolean
 
 from algebra import *
 from randomSU2 import *
@@ -682,6 +682,7 @@ def expMatrix(idtau, P):
 
     return eM
 
+
 @njit()
 def ta(mat):
     """Traceless antihermitian part of a matrix"""
@@ -700,9 +701,60 @@ def ta(mat):
 
     for i in range(3):
         mat[i][i] -= trace
-        
-# U = initialize_lattice(1, 5)
-# gramschmidt2puntozero(U[0, 0, 0, 1, 1])
+
+
+@njit(boolean(complex128[:, :]), fastmath=True)
+def antiHermitianVerify(A):
+    if A.any() == (-A.conj().T).any():
+        return True
+    else:
+        return False
+
+
+# project matrix on SU(3)
+@njit(fastmath=True)
+def unitarize(M):
+    """Non lo sooo l'ho copiata da Bonati"""
+
+    norm = 0
+    for i in range(3):
+        norm += np.real(M[0][i]) * np.real(M[0][i]) + np.imag(M[0][i]) * np.imag(
+            M[0][i]
+        )
+    norm = 1 / np.sqrt(norm)
+    for i in range(3):
+        M[0][i] *= norm
+
+    prod = 0 + 0j
+    for i in range(3):
+        prod += np.conj(M[0][i]) * M[1][i]
+    for i in range(3):
+        M[1][i] -= prod * M[0][i]
+    norm = 0
+    for i in range(3):
+        norm += np.real(M[1][i]) * np.real(M[1][i]) + np.imag(M[1][i]) * np.imag(
+            M[1][i]
+        )
+    norm = 1 / np.sqrt(norm)
+    for i in range(3):
+        M[1][i] *= norm
+    prod = M[0][1] * M[1][2] - M[0][2] * M[1][1]
+    M[2][0] = np.conj(prod)
+    prod = M[0][2] * M[1][0] - M[0][0] * M[1][2]
+    M[2][1] = np.conj(prod)
+    prod = M[0][0] * M[1][1] - M[0][1] * M[1][0]
+    M[2][2] = np.conj(prod)
+
+
+# void Su3::sunitarize(void)
+#
+#   prod=comp[0][1]*comp[1][2]-comp[0][2]*comp[1][1];
+#   comp[2][0]=conj(prod);
+#   prod=comp[0][2]*comp[1][0]-comp[0][0]*comp[1][2];
+#   comp[2][1]=conj(prod);
+#   prod=comp[0][0]*comp[1][1]-comp[0][1]*comp[1][0];
+#   comp[2][2]=conj(prod);
+#   }
 
 if __name__ == "__main__":
     U = initialize_lattice(1)

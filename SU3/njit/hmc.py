@@ -32,14 +32,6 @@ deltaH must be of order O(dtau^2) [6]
 """
 
 
-@njit(boolean(complex128[:, :]), fastmath=True)
-def antiHermitianVerify(A):
-    if A.any() == (-A.conj().T).any():
-        return True
-    else:
-        return False
-
-
 @njit(float64(int64, int64, complex128[:, :, :, :, :, :, :], float64), fastmath=True)
 def Sgauge(R, T, U, beta):
 
@@ -56,7 +48,7 @@ def Sgauge(R, T, U, beta):
                         somma += -(beta / su3) * np.trace(
                             (U[x, y, z, t, mu] @ A.conj().T).real
                         )
-    return somma
+    return somma  # / (Ns**3 * Nt * 2)
 
 
 @njit(
@@ -157,6 +149,15 @@ def move_P_due(U, P, beta, dtau):
 """this is a test script"""
 
 
+@njit(
+    (
+        complex128[:, :, :, :, :, :, :],
+        complex128[:, :, :, :, :, :, :],
+        float64,
+        float64,
+    ),
+    fastmath=True,
+)
 def move_U(U, P, beta, deltat):
     for x in range(Ns):
         for y in range(Ns):
@@ -171,22 +172,54 @@ def move_U(U, P, beta, deltat):
 
 @njit(
     complex128(
-        complex128[:, :, :, :, :, :, :], complex128[:, :, :, :, :, :, :], float64
+        complex128[:, :, :, :, :, :, :],
+        complex128[:, :, :, :, :, :, :],
+        float64,
+        boolean,
     )
 )
-def Hamiltonian(U, P, beta):
+def Hamiltonian(U, P, beta, onlyP):
+    """Hamiltonian for the HMC algorithm"""
 
     H = 0
+    if onlyP:
+        H = 0
+        for x in range(Ns):
+            for y in range(Ns):
+                for z in range(Ns):
+                    for t in range(Nt):
+                        for mu in range(4):
+
+                            H += np.trace(
+                                P[x, y, z, t, mu] @ P[x, y, z, t, mu].conj().T
+                            )
+        return H
+
+    else:
+
+        for x in range(Ns):
+            for y in range(Ns):
+                for z in range(Ns):
+                    for t in range(Nt):
+                        for mu in range(4):
+
+                            H += (
+                                np.trace(P[x, y, z, t, mu] @ P[x, y, z, t, mu].conj().T)
+                            ) / (Ns**3 * Nt)
+        H += Sgauge(R, T, U, beta)
+
+        return H
+
+
+@njit(fastmath=True)
+def UnitarizeConfiguration(C):
 
     for x in range(Ns):
         for y in range(Ns):
             for z in range(Ns):
                 for t in range(Nt):
                     for mu in range(4):
-                        H += np.trace(P[x, y, z, t, mu] @ P[x, y, z, t, mu].conj().T)
-    H += Sgauge(R, T, U, beta)
-
-    return H
+                        unitarize(C[x, y, z, t, mu])
 
 
 @njit(boolean(complex128, complex128))
@@ -194,7 +227,7 @@ def MetropolisTest(Hold, Hnew):
     """Metropolis acceptance test"""
 
     deltaH = (Hnew - Hold).real
-    deltaH = deltaH / (Ns**3 * Nt * 2)
+    deltaH = deltaH
     if deltaH < 0:
         print("accett")
         return True
@@ -204,6 +237,7 @@ def MetropolisTest(Hold, Hnew):
         return True
 
     else:
+        print("rifiut")
         return False
 
 
@@ -219,7 +253,7 @@ def leapFrogIntegrator(U, P, beta):
     move_P_due(U, P, beta, dtau / 2)
 
     # leapfrog
-    for _ in range(Nstep):
+    for _ in range(Nstep - 1):
         if _ % 10 == 0:
             print("time step = ", _)
         move_U(U, P, beta, dtau)
@@ -227,7 +261,7 @@ def leapFrogIntegrator(U, P, beta):
 
     # last steps
     move_U(U, P, beta, dtau)
-    move_P_due(U, P, beta, dtau / 2)
+    # move_P_due(U, P, beta, dtau / 2)
 
 
 @njit(float64[:](complex128[:, :, :, :, :, :, :], float64), fastmath=True)
@@ -235,20 +269,33 @@ def HMC_definitivo_siSpera(U, beta):
     """this is the definitivo version of HMC, IFFFFfF it works!"""
     Wilsons = np.zeros((N_conf), dtype=np.float64)
     print("Execution for beta = ", beta)
+    acceptance_rate = 0
+
     for conf in range(N_conf):
         print("configurationssssssssssss = ", conf)
 
         Uold = U.copy()
         Unew = U.copy()
         P = initialMomenta()
+        Pold = P.copy()
+        HPold = Hamiltonian(Uold, Pold, beta, onlyP=True)
 
         # integration of flow equations through leaprfrog
         leapFrogIntegrator(Unew, P, beta)
+        UnitarizeConfiguration(P)
 
         # metropolis a/r-----------------------------------------------
-        Hold = Hamiltonian(Uold, P, beta)
-        Hnew = Hamiltonian(Unew, P, beta)
-        print("deltaH = ", Hnew - Hold)
+        Hold = Hamiltonian(Uold, P, beta, onlyP=False)
+        Hnew = Hamiltonian(Unew, P, beta, onlyP=False)
+        HpNew = Hamiltonian(Unew, P, beta, onlyP=True)
+
+        # normalize?
+        Hold = Hold
+        Hnew = Hnew
+
+        # print("deltaH = ", Hnew - Hold)
+        print("Only Sgauge", Sgauge(R, T, Unew, beta))
+        print("Only P", HpNew)
 
         if conf == 0:  # accept the first configuration a priori
             U = Unew.copy()
@@ -261,13 +308,17 @@ def HMC_definitivo_siSpera(U, beta):
 
             if Metrotest:
                 U = Unew.copy()
+                acceptance_rate += 1
             elif not Metrotest:
                 U = Uold.copy()
             # U = Unew.copy()
             # Wilson = WilsonAction(R, T, U)
             print("Wilson action = ", Wilson)
+
             Wilsons[conf] = Wilson
         # --------------------------------------------------------------------------------------------
+    print("Acceptance rate for beta", beta, (acceptance_rate / (conf)))
+
     return Wilsons
 
 
@@ -291,7 +342,8 @@ if __name__ == "__main__":
             # wilson action for hb
             WilsonHb = WilsonAction(R, T, Uhb)
             # Hold = Hamiltonian(Uhmc, P)
-            # one leapfrog step
+
+            # one leapfrog step-------
             move_P_due(Uhmc, P, beta, dtau / 2)
             for _ in range(20):
                 print("time step = ", _)
@@ -300,6 +352,7 @@ if __name__ == "__main__":
 
             move_U(Uhmc, P, beta, dtau)
             move_P_due(Uhmc, P, beta, dtau / 2)
+            # ----------------------------
 
             # Wilspn action for hmc
             Wilsonhmc = WilsonAction(R, T, Uhmc)
@@ -314,7 +367,6 @@ if __name__ == "__main__":
         with multiprocessing.Pool(processes=len(beta_vec)) as pool:
             temp = partial(HMC_definitivo_siSpera, U)
             Ws = np.array(pool.map(temp, beta_vec))
-        print("Wilson action")
 
         S_mean = []
         for wbeta in Ws:
