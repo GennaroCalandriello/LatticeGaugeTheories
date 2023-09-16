@@ -204,11 +204,17 @@ def Hamiltonian(U, P, beta, onlyP):
                         for mu in range(4):
 
                             H += (
-                                np.trace(P[x, y, z, t, mu] @ P[x, y, z, t, mu].conj().T)
-                            ) / (Ns**3 * Nt)
+                                0.5
+                                * (
+                                    np.trace(
+                                        P[x, y, z, t, mu] @ P[x, y, z, t, mu].conj().T
+                                    )
+                                )
+                                / (Ns**3 * Nt)
+                            )
         H += Sgauge(R, T, U, beta)
 
-        return H
+        return H / (Ns**3 * Nt * 6)
 
 
 @njit(fastmath=True)
@@ -261,7 +267,6 @@ def leapFrogIntegrator(U, P, beta):
 
     # last steps
     move_U(U, P, beta, dtau)
-    # move_P_due(U, P, beta, dtau / 2)
 
 
 @njit(float64[:](complex128[:, :, :, :, :, :, :], float64), fastmath=True)
@@ -287,15 +292,14 @@ def HMC_definitivo_siSpera(U, beta):
         # metropolis a/r-----------------------------------------------
         Hold = Hamiltonian(Uold, P, beta, onlyP=False)
         Hnew = Hamiltonian(Unew, P, beta, onlyP=False)
-        HpNew = Hamiltonian(Unew, P, beta, onlyP=True)
 
         # normalize?
         Hold = Hold
         Hnew = Hnew
 
         # print("deltaH = ", Hnew - Hold)
-        print("Only Sgauge", Sgauge(R, T, Unew, beta))
-        print("Only P", HpNew)
+
+        # print("Only P", HpNew) #10368
 
         if conf == 0:  # accept the first configuration a priori
             U = Unew.copy()
@@ -315,15 +319,34 @@ def HMC_definitivo_siSpera(U, beta):
             # Wilson = WilsonAction(R, T, U)
             print("Wilson action = ", Wilson)
 
-            Wilsons[conf] = Wilson
+        ####senza metropolis
+        # U = Unew.copy()
+        # Wilson = WilsonAction(R, T, U)
+
+        Wilsons[conf] = Wilson
         # --------------------------------------------------------------------------------------------
     print("Acceptance rate for beta", beta, (acceptance_rate / (conf)))
 
     return Wilsons
 
 
+@njit(float64[:](complex128[:, :, :, :, :, :, :], float64), fastmath=True)
+def comparisonWithHB(U, beta):
+    """For a comparison"""
+
+    print("executione heatbattttth beta = ", beta)
+    WilsonsHB = []
+    for conf in range(N_conf):
+        U = HB_updating_links(beta, U)
+        WilsonsHB.append(WilsonAction(R, T, U))
+    WilsonsHB = np.array(WilsonsHB)
+
+    return WilsonsHB
+
+
 if __name__ == "__main__":
     U = initialize_lattice(1)
+    Uhb = U.copy()
     print("initialwislon action", WilsonAction(R, T, U))
     # P = initialMomenta()
 
@@ -368,13 +391,23 @@ if __name__ == "__main__":
             temp = partial(HMC_definitivo_siSpera, U)
             Ws = np.array(pool.map(temp, beta_vec))
 
+            temp1 = partial(comparisonWithHB, Uhb)
+            WsHB = np.array(pool.map(temp1, beta_vec))
+
+            pool.close()
+            pool.join()
+
         S_mean = []
-        for wbeta in Ws:
-            S_mean.append(np.mean(wbeta))
+        S_meanHB = []
+        for b in range(len(Ws)):
+            S_mean.append(np.mean(Ws[b]))
+            S_meanHB.append(np.mean(WsHB[b]))
 
         plt.figure()
-        plt.scatter(beta_vec, S_mean)
+        plt.scatter(beta_vec, S_mean, marker="x", color="red", label="HMC")
+        plt.scatter(beta_vec, S_meanHB, marker="x", color="blue", label="HB")
         plt.xlabel(r"$\beta$")
+        plt.legend()
         plt.ylabel(r"$S_W$")
         plt.show()
         np.savetxt("data/S_mean_HMC.txt", S_mean)
