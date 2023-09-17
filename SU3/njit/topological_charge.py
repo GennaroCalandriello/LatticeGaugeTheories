@@ -1,8 +1,9 @@
 # from hmc import *
-from calendar import c
+from functools import partial
 from matplotlib.pyplot import hist
 from functions import *
 from HB_OR_SU3 import *
+import time
 
 
 @njit(
@@ -35,7 +36,7 @@ def Plaq(U, x, y, z, t, mu, nu):
         ]
         .conj()
         .T
-        @ U[(x), (y), (z), (y), nu].conj().T
+        @ U[(x), (y), (z), (t), nu].conj().T
     )
     return P
 
@@ -52,38 +53,101 @@ def epsilon_():
     return epsilon
 
 
-@njit(complex128(complex128[:, :, :, :, :, :, :]), fastmath=True)
+epsilon = epsilon_()
+
+
+@njit()
 def q(U):
 
-    topo = 0
-    N = 1 / (32 * np.pi**2)
-    epsilon = epsilon_()
-    print("esplsilonooo", epsilon[1, 2, 3, 0])
+    N = -1 / (32 * np.pi**2)
+    # epsilon = epsilon_()
+    # topo = []
+    Q = 0
+
     for x in range(Ns):
         for y in range(Ns):
             for z in range(Ns):
                 for t in range(Nt):
+                    topotemp = 0
                     for mu in range(4):
                         for nu in range(4):
                             for rho in range(4):
                                 for sigma in range(4):
-                                    topo += epsilon[mu, nu, rho, sigma] * np.trace(
-                                        Plaq(U, x, y, z, t, mu, nu)
-                                        @ Plaq(U, x, y, z, t, rho, sigma)
-                                    )
-    topo *= N
-    return topo
+                                    if epsilon[mu, nu, rho, sigma] != 0:
+                                        topotemp += (
+                                            N
+                                            * epsilon[mu, nu, rho, sigma]
+                                            * np.trace(
+                                                Plaq(U, x, y, z, t, mu, nu)
+                                                @ Plaq(U, x, y, z, t, rho, sigma)
+                                            )
+                                        )
+
+                    # print("topotemp", topotemp)
+                    # topo.append(topotemp)
+                    Q += topotemp
+    # topo = np.array(topo)
+    return Q
+
+
+def topoCalculus(U, beta):
+    "return array of topological charges for each configuration"
+    print("Topolone beta:", beta)
+    topo_charge = []
+
+    for _ in range(N_conf):
+        U = HB_updating_links(beta, U)
+        # U = OverRelaxation_(U)
+        Q = q(U)
+        if _ % 10 == 0:
+            print("conf:", _)
+
+        topo_charge.append(Q)
+
+    return np.array(topo_charge)
+
+
+def FreedmanDiaconis(spacings):
+
+    q1, q3 = np.percentile(spacings, [25, 75])
+    iqr = q3 - q1
+    n = len(spacings)
+
+    bin_width = 2 * iqr / (n ** (1 / 3))
+    data_range = spacings.max() - spacings.min()
+    num_bins = int(np.ceil(data_range / bin_width))
+
+    return num_bins
+
+
+def main():
+    topototal = []
+    U = initialize_lattice(1)
+
+    start = time.time()
+
+    with multiprocessing.Pool(processes=len(beta_vec)) as pool:
+        temp = partial(topoCalculus, U)
+        topo_charges = np.array(pool.map(temp, beta_vec))
+    print("topo_charge", topo_charges.shape)
+
+    # np.savetxt("topo_charge_beta_ 3.4_5.7_7.9.txt", topo_charges)
+
+    print("lunghezza", len(topo_charges[0]))
+    plt.figure()
+    for t in range(len(topo_charges)):
+        plt.hist(
+            topo_charges[t].imag,
+            bins=FreedmanDiaconis(topo_charges[t].imag),
+            histtype="step",
+        )
+    plt.show()
+
+    print("time:", round(time.time() - start))
+    np.savetxt("topo_charge_beta_ 3.4_5.7_7.9.txt", topo_charges)
 
 
 if __name__ == "__main__":
-    topo_charge = []
-    U = initialize_lattice(1)
-    for _ in range(400):
-        if _ % 10 == 0:
-            print("conf:", _)
-        U = HB_updating_links(6.7, U)
-        topo_charge.append(q(U))
+    pass
 
-    plt.figure()
-    plt.hist(topo_charge, bins=100, density=True, histtype="step", color="red")
-    plt.show()
+    # main()

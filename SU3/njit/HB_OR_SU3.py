@@ -42,8 +42,44 @@ sx = np.array(((0, 1), (1, 0)), dtype=np.complex128)
 sy = np.array(((0, -1j), (1j, 0)), dtype=np.complex128)
 sz = np.array(((1, 0), (0, -1)), dtype=np.complex128)
 
+
+@njit(complex128[:, :](complex128[:, :], float64, int64))
+def heatbath_SU3(W, beta, subgrp):
+    kind = 1
+    """Execute Heat Bath on each of three submatrices of SU(3) (R, S; and T) through the quaternion representation. HB
+    extracts the SU(2) matrix directly from the distribution that leaves the Haar measure invariant"""
+
+    if subgrp == 1:
+        Wsub = np.array(((W[0, 0], W[0, 1]), (W[1, 0], W[1, 1])))
+    if subgrp == 2:
+        Wsub = np.array(((W[0, 0], W[0, 2]), (W[2, 0], W[2, 2])))
+    if subgrp == 3:
+        Wsub = np.array(((W[1, 1], W[1, 2]), (W[2, 1], W[2, 2])))
+
+    if kind == 1:
+        w = getA(Wsub)
+        a = np.sqrt(np.abs(np.linalg.det(Wsub)))
+        wbar = quaternion(normalize(w))
+
+        if a != 0:
+            xw = quaternion(sampleA(beta * 2 / 3, a))
+
+            xx = xw @ wbar.conj().T  ###!!!!warning!!!
+
+            return xx
+
+        else:
+            return SU2SingleMatrix()
+
+    if kind == 2:
+        return sample_HB_SU2(Wsub, beta)
+
+
 #
-@njit()
+@njit(
+    complex128[:, :, :, :, :, :, :](float64, complex128[:, :, :, :, :, :, :]),
+    fastmath=True,
+)
 def HB_updating_links(beta, U):
 
     """Update each link via the heatbath algorithm"""
@@ -72,7 +108,7 @@ def HB_updating_links(beta, U):
 
                         if a != 0:
                             # else:
-                            r = heatbath_SU3(W, beta, "R")
+                            r = heatbath_SU3(W, beta, 1)
                             R = np.array(
                                 (
                                     (r[0, 0], r[0, 1], 0),
@@ -82,7 +118,7 @@ def HB_updating_links(beta, U):
                             )
 
                             W = np.dot(R, W)
-                            s = heatbath_SU3(W, beta, "S")
+                            s = heatbath_SU3(W, beta, 2)
 
                             S = np.array(
                                 (
@@ -94,7 +130,7 @@ def HB_updating_links(beta, U):
 
                             W = np.dot(S, W)
 
-                            tt = heatbath_SU3(W, beta, "T")
+                            tt = heatbath_SU3(W, beta, 3)
 
                             T = np.array(
                                 (
@@ -176,38 +212,6 @@ def invMatrix(M):
     evals, evecs = np.linalg.eig(M)
     inv = evecs @ np.diag(1 / evals) @ np.linalg.inv(evecs)
     return inv
-
-
-@njit()
-def heatbath_SU3(W, beta, subgrp, kind=1):
-
-    """Execute Heat Bath on each of three submatrices of SU(3) (R, S; and T) through the quaternion representation. HB
-    extracts the SU(2) matrix directly from the distribution that leaves the Haar measure invariant"""
-
-    if subgrp == "R":
-        Wsub = np.array(((W[0, 0], W[0, 1]), (W[1, 0], W[1, 1])))
-    if subgrp == "S":
-        Wsub = np.array(((W[0, 0], W[0, 2]), (W[2, 0], W[2, 2])))
-    if subgrp == "T":
-        Wsub = np.array(((W[1, 1], W[1, 2]), (W[2, 1], W[2, 2])))
-
-    if kind == 1:
-        w = getA(Wsub)
-        a = np.sqrt(np.abs(np.linalg.det(Wsub)))
-        wbar = quaternion(normalize(w))
-
-        if a != 0:
-            xw = quaternion(sampleA(beta * 2 / 3, a))
-
-            xx = xw @ wbar.conj().T  ###!!!!warning!!!
-
-            return xx
-
-        else:
-            return SU2SingleMatrix()
-
-    if kind == 2:
-        return sample_HB_SU2(Wsub, beta)
 
 
 @njit()

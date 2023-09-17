@@ -446,7 +446,7 @@ def det_calculus(W, manual=False):
     return det1
 
 
-@njit()
+@njit(float64[:](float64[:]), fastmath=True)
 def normalize(v):
 
     sum = 0
@@ -559,7 +559,7 @@ def sample_HB_SU2(su2matrix, beta):
     return Ulink
 
 
-@njit()
+@njit(complex128[:, :](float64[:]), fastmath=True)
 def quaternion(vec):
 
     """produces quaternion from a vector of complex and real numbers"""
@@ -573,13 +573,12 @@ def quaternion(vec):
     a21 = complex(-vec[2], vec[1])
     a22 = complex(vec[0], -vec[3])
 
-    quat = np.array(((a11, a12), (a21, a22)))
-    ##########maybe should be normalized
+    quat = np.array(((a11, a12), (a21, a22)), dtype=np.complex128)
 
     return quat
 
 
-@njit()
+@njit(float64[:](float64, float64), fastmath=True)
 def sampleA(a, beta):
 
     """choose a0 with P(a0) ~ sqrt(1 - a0^2) * exp(beta * k * a0)"""
@@ -597,11 +596,6 @@ def sampleA(a, beta):
     a2 = np.random.normal()
     a3 = np.random.normal()
 
-    # while (a1 ** 2 + a2 ** 2 + a3 ** 2) > 1:
-    #     a1 = np.random.normal()
-    #     a2 = np.random.normal()
-    #     a3 = np.random.normal()
-
     norm = np.sqrt(a1**2 + a2**2 + a3**2)
 
     a1 = a1 * r / norm
@@ -614,7 +608,7 @@ def sampleA(a, beta):
     return avec
 
 
-@njit()
+@njit(float64[:](complex128[:, :]), fastmath=True)
 def getA(W):
 
     """Construct the vector needed for the quaternion"""
@@ -626,14 +620,6 @@ def getA(W):
     Avector = np.array((a0, a1, a2, a3))  # [a0, a1, a2, a3]
 
     return Avector
-
-
-@njit()
-def HeatbathReconstructed():
-
-    """From: Lattice Simulations of the SU(2) multi-Higgs fields"""
-
-    return 1
 
 
 @njit()
@@ -649,11 +635,6 @@ def PeriodicBC(U, t, x, y, z, N):
         U[t, x, y, z] = U[t, x, 0, z]
     if z == N - 1:
         U[t, x, y, z] = U[t, x, y, 0]
-
-    # U[N-1, x, y, z]=U[0, x, y, z]
-    # U[t, N-1, y, z]=U[t, 0, y, z]
-    # U[t, x, N-1, z]=U[t, x, 0, z]
-    # U[t, x, y, N-1]=U[t, x, y, 0]
 
     return U[t, x, y, z]
 
