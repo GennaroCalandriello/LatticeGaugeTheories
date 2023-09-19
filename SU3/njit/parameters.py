@@ -3,14 +3,14 @@ import numpy as np
 su3 = 3
 su2 = 2
 epsilon = 0.2
-Ns = 6
-Nt = 4
+Ns = 7
+Nt = 5
 pool_size = Ns**4
 measures = 3
 idecorrel = 4
 
-N_conf = 5000
-Nstep = 40  # number of leapfrog steps
+N_conf = 200
+Nstep = 100  # number of leapfrog steps
 R = 1
 T = 1
 thermalization = 10
@@ -18,13 +18,17 @@ thermalization = 10
 # hybrid monte carlo-----------------------------------
 tau = 1  # trajectory length
 dtau = tau / Nstep  # 1 / Nstep  # leapfrog step dtau =0.0375 setting from reference [4]
-print("dtau:", dtau)
+print("dtauHMC:", dtau)
 # -------------------------------------------------------
 
 # gradient flow parameters
 Nstepflow = 50
-tauflow = 7
+tauflow = 1
 dtauflow = tauflow / Nstepflow
+
+c1 = -1 / 12  # parameters for Xmu from the clover terms
+c0 = 1 - 8 * c1
+
 print("dtauflow:", dtauflow)
 # -------------------------------------------------------
 
