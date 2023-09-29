@@ -1,7 +1,6 @@
 #ifndef DISTRIBUTIONS_H
 #define DISTRIBUTIONS_H
 #include "func/paulimatrices.h"
-#include "func/lattice.h"
 #include <complex>
 #include <array>
 #include <iostream>

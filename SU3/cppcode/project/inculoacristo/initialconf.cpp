@@ -2,8 +2,7 @@
 #include <ctime>
 #include <complex>
 #include <random>
-#include "func/lattice.h"
-#include "func/SU3Matrix.cpp"
+#include "func/SU3Matrix.h"
 #include "initialconf.h"
 
 
@@ -47,14 +46,15 @@ Lattice initialize_lattice()
     return U;
 }
 
-
-int main()
-{
-    srand (clock());
-    Lattice lattice = initialize_lattice();
-    SU3Matrix temp = lattice[0][0][0][0][0];
-    cout << "quest est nu testt" << endl;
-    cout << temp(0, 2) << endl;
-    // SU3Matrix temp2 = (temp).conjT();
+// TESTED, it works!!!
+// int main()
+// {
+//     srand (clock());
+//     Lattice lattice = initialize_lattice();
+//     SU3Matrix temp = lattice[0][0][0][0][0];
+//     cout << "quest est nu testt" << endl;
+//     complex<double> deter = temp.det();
+//     cout << deter << endl;
+//     // SU3Matrix temp2 = (temp).conjT();
     
-}
+// }

@@ -6,9 +6,8 @@
 
 #include "paulimatrices.h"
 #include "su2.h"
-#include "distributions.cpp"
+#include "distributions.h"
 
-const double epsilon = 0.1;
 using namespace std;
 
 ComplexMatrix2x2 su2_matrix(){

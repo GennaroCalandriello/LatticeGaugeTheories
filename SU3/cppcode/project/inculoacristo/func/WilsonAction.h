@@ -1,10 +1,11 @@
-#ifdef WILSONACTION_H
+#ifndef WILSONACTION_H
 #define WILSONACTION_H
 
 #include <complex>
 #include <array>
-#include "func/lattice.h"
-#include "func/paulimatrices.h"
+#include "paulimatrices.h"
+#include "SU3Matrix.h"
+
 
 using namespace std;
 
