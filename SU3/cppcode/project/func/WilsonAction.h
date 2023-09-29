@@ -9,4 +9,7 @@
 
 using namespace std;
 
+SU3Matrix staple(Lattice U, int x, int y, int z, int t, int dir);
+vector<int> index(int x, int y, int z, int t, int dir, int l, const vector<int> a_dir, const string& direction);
+
 #endif // WILSONACTION_H

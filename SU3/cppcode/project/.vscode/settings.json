@@ -1,4 +1,5 @@
 {
+    "terminal.integrated.cwd": "${workspaceFolder}",
     "files.associations": {
         "iostream": "cpp",
         "any": "cpp",

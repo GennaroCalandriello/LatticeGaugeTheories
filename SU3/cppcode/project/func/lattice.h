@@ -37,7 +37,7 @@ void printConfiguration(Lattice U);
 #endif
 
 
-//  la sintassi Lattice::LatticeSU3& Lattice::operator[](size_t index) definisce l'operatore di indicizzazione operator[] per la classe Lattice. Vediamo ogni parte di questa dichiarazione:
+//  la sintassi "Lattice::LatticeSU3& Lattice::operator[](size_t index)" definisce l'operatore di indicizzazione operator[] per la classe Lattice. Vediamo ogni parte di questa dichiarazione:
 
 // Lattice::LatticeSU3&
 

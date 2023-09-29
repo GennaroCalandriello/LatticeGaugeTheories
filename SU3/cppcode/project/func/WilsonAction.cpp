@@ -2,10 +2,14 @@
 #include <ctime>
 #include <complex>
 #include <random>
+#include <array>
+#include <vector>
 
-// #include "SU3Matrix.h"
-// #include "const.h"
-// #include "lattice.h"
+#include "SU3Matrix.h"
+#include "const.h"
+#include "lattice.h"
+
+// execute with command: g++ -g3 -Wall WilsonAction.cpp lattice.cpp SU3Matrix.cpp distributions.cpp su2.cpp -o WilsonAction.exe
 
 vector<int> index(const int x,const  int y, const int z,const  int t, int dir, int l, const vector<int> a_dir, const string& direction)
 {
@@ -31,7 +35,7 @@ vector<int> index(const int x,const  int y, const int z,const  int t, int dir, i
 
 }
 
-SU3Matrix staple(Lattice**** U, int x, int y, int z, int t, int mu){
+SU3Matrix staple(Lattice U, int x, int y, int z, int t, int mu){
 
     SU3Matrix::Matrix elW1{{
         {{0, 0, 0}},
@@ -73,11 +77,13 @@ SU3Matrix staple(Lattice**** U, int x, int y, int z, int t, int mu){
         vector<int> pmu_m_nu = index(pmu[0], pmu[1], pmu[2], pmu[3], nu, 1, a_nu, "b");
 
 
-        W1 =U[pmu[0]][pmu[1]][pmu[2]][pmu[3]][nu]*U[pnu[0]][pnu[1]][pnu[2]][pnu[3]][mu]*(U[x][y][z][t][nu]).conjT();
+        W1 =U(pmu[0], pmu[1], pmu[2], pmu[3], nu)*U(pnu[0], pnu[1], pnu[2], pnu[3], mu)*(U(x, y, z, t, nu)).conjT();
                 
-        W2 =U[pmu_m_nu[0]][pmu_m_nu[1]][pmu_m_nu[2]][pmu_m_nu[3]][nu].conjT()*U[mnu[0]][mnu[1]][mnu[2]][mnu[3]][mu].conjT()*U[mnu[0]][mnu[1]][mnu[2]][mnu[3]][nu];
+        W2 =U(
+            pmu_m_nu[0], pmu_m_nu[1], pmu_m_nu[2], pmu_m_nu[3], nu).conjT()*U(
+                mnu[0], mnu[1], mnu[2], mnu[3], mu).conjT()*U(mnu[0], mnu[1], mnu[2], mnu[3], nu);
 
-        Wf = W1+W2; // should perform Wf += W1+W2
+        Wf += W1+W2; // should perform Wf += W1+W2
     }
     
     return Wf;
@@ -118,3 +124,17 @@ SU3Matrix staple(Lattice**** U, int x, int y, int z, int t, int mu){
         
 //     return S;
 // }
+
+int main(){
+    std::cout<<"first plaquette"<<std::endl;
+    Lattice U;
+    U = fill();
+    SU3Matrix plaquette = staple(U, 0, 0, 0, 0, 0);
+
+    for (int q = 0; q<su3; q++){
+        for (int d = 0; d<su3; d++){
+            std::cout<<plaquette(q, d)<<std::endl;
+        }
+    }
+    std::cout<<"determinanto"<< plaquette.det()<<std::endl;
+}
