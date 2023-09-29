@@ -82,7 +82,7 @@ SU3Matrix& SU3Matrix::operator*=(const SU3Matrix& rhs) {
     return *this;
 }
 
-Complex SU3Matrix::operator()(int row, int col) const {
+Complex& SU3Matrix::operator()(int row, int col) {
     if (row >= 0 && row < 3 && col >= 0 && col < 3) {
         return elements_[row][col];
 
@@ -125,6 +125,29 @@ Complex SU3Matrix::det() const {
         return a * (e*i - f*h) - b * (d*i - f*g) + c * (d*h - e*g);
 }
 
+Complex SU3Matrix::tr() const {
+    Complex trace = 0;
+    for (int i = 0; i < 3; i++) {
+        trace += elements_[i][i];
+    }
+    return trace;
+}
+
+double SU3Matrix::reTr()  const {
+    double realTrace =0;
+    for (int i = 0; i < 3; i++) {
+        realTrace += elements_[i][i].real();
+    }
+    return realTrace;
+}
+
+SU3Matrix Id() {
+    SU3Matrix identity;
+    for (int i = 0; i < su3; i++) {
+        identity(i, i) = Complex(1, 0);
+    }
+    return identity;
+}
  
 
 SU3Matrix su3_generator() {
@@ -178,11 +201,15 @@ SU3Matrix su3_generator() {
     // Add a default return statement
 }
 
+// TESTED AND WORKS FINE
 // int main() {
 
 //     SU3Matrix prova = su3_generator();
 //     complex<double> det = prova.det();
+//     SU3Matrix Identity = Id();
 //     cout << prova(0, 1) << endl;
+//     cout << prova.reTr() << endl;
 //     cout << det << endl;
+//     cout <<"identiti" << Identity(0, 0) << Identity(1,1) << Identity(2,2)<<endl;
 
 // }
