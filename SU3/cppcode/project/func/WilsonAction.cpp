@@ -212,4 +212,6 @@ int main() {
   U = fill();
   double cazz = Wilson(U, 1, 1);
   cout << "questa è la dimensione del tuo cazzo" << cazz << endl;
+  SU3Matrix staplla = staple(U, 0, 0, 0, 0, 0);
+  cout << "questa è la dimensione del tuo bucodiculo" << staplla.reTr() << endl;
 }

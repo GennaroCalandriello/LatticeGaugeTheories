@@ -7,10 +7,10 @@
 
 using namespace std;
 
-double gauss_() {
+double gauss_(double mean, double sigma) {
   random_device rd;
   mt19937 gen(rd());
-  normal_distribution<double> d(0, 1);
+  normal_distribution<double> d(mean, sigma);
 
   return d(gen);
 }
