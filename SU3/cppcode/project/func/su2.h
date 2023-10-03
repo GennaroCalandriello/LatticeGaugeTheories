@@ -3,18 +3,49 @@
 #define SU2_MATRIX_H
 
 // Necessary includes
-#include <complex>
+#include "const.h"
 #include <array>
+#include <complex>
 
-// Use necessary namespaces or avoid it in header files for more encapsulation
 using namespace std;
 using Complex = complex<double>;
 
-// Type definitions and constants
-using ComplexMatrix2x2 = array<array<Complex, 2>, 2>;
-const double epsilon = 0.1;
+class SU2Matrix {
+public:
+  using Matrix = array<array<Complex, 2>, 2>;
 
-// Function prototypes
-ComplexMatrix2x2 su2_matrix();
+  // default constructor
+  SU2Matrix() {
+    for (int i = 0; i < su2; i++) {
+      for (int j = 0; j < su2; j++) {
+        elements_[i][j] = Complex(0.0, 0.0);
+      }
+    }
+  };
+
+  // Constructor that takes a Matrix as a parameter (PARAMETRIC CONSTRUCTOR)
+  SU2Matrix(Matrix &elements);
+  // destructor
+  ~SU2Matrix();
+
+  SU2Matrix operator+(const SU2Matrix &other) const;
+  SU2Matrix operator-(const SU2Matrix &other) const;
+  SU2Matrix operator*(const SU2Matrix &other) const;
+  SU2Matrix &operator+=(const SU2Matrix &rhs);
+  SU2Matrix &operator*=(const SU2Matrix &rhs);
+  Complex &operator()(int row, int col);
+
+  void print() const;
+  SU2Matrix conjT() const;
+  Complex det() const;
+  Complex tr() const;
+  double reTr() const;
+
+private:
+  Matrix elements_;
+};
+
+SU2Matrix su2_generator();
+SU2Matrix IdentityMat();
 
 #endif // SU2_MATRIX_H
