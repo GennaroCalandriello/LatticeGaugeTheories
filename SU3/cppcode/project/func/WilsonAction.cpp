@@ -50,12 +50,10 @@ int positiveMod(int x, int N) {
   //*ensures that the modulus operation result is always positive.*/
 
   int x_pos = (x % N + N) % N;
-  cout << x_pos << endl;
   return x_pos;
 }
 
 SU3Matrix staple(Lattice U, int x, int y, int z, int t, int mu) {
-  cout << "scusa ma ci arrivi??" << endl;
   vector<int> a_mu(4, 0);
   a_mu[mu] = 1;
   SU3Matrix A;

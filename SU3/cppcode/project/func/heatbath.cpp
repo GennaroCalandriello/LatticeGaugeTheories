@@ -192,9 +192,17 @@ vector<double> Heatbath::sampleA(double a, double beta) {
 }
 
 // testing
-// int main() {
-//   cout << "quest è nu testt" << endl;
-//   Lattice U;
-//   U = fill();
-//   printConfiguration(U);
-// }
+int main() {
+  cout << "quest è nu testt" << endl;
+  Lattice U;
+  U = fill();
+  double W1 = Wilson(U, 1, 1);
+  cout << "Wilson action prima" << W1 << endl;
+  Heatbath HB;
+  for (int i = 0; i < 15; i++) {
+    cout << "HB num. " << i << endl;
+    HB.HB_update(U, 1);
+  }
+  double W2 = Wilson(U, 1, 1);
+  cout << "Wilson action dopo" << W2 << endl;
+}

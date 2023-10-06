@@ -15,16 +15,11 @@ using namespace std;
 Lattice fill() {
   Lattice U;
   for (int x = 0; x < Ns; x++) {
-    std::cout << "indices" << x << std::endl;
     for (int y = 0; y < Ns; y++) {
-      // cout << "indices" << x << y << endl;
       for (int z = 0; z < Ns; z++) {
         for (int t = 0; t < Nt; t++) {
           for (int mu = 0; mu < dir; mu++) {
             SU3Matrix temp = su3_generator();
-
-            std::cout << "indices" << x << y << z << t << mu << std::endl;
-
             U(x, y, z, t, mu) = temp;
           }
         }
