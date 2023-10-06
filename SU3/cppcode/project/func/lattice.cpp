@@ -1,70 +1,93 @@
-#include <iostream>
 #include "lattice.h"
 #include "SU3Matrix.h"
 #include "const.h"
+#include "distributions.h"
+#include "su2.h"
+#include <iostream>
+#include <vector>
 
-// execute with command: g++ -g3 -Wall lattice.cpp SU3Matrix.cpp distributions.cpp su2.cpp -o lattice.exe
+// execute with command: g++ -g3 -Wall lattice.cpp SU3Matrix.cpp
+// distributions.cpp su2.cpp -o lattice.exe
 
 using namespace std;
 
-Lattice::Lattice() : U() {
-
-}
-// SU3Matrix::SU3Matrix(const Matrix& elements) : elements_(elements) {}
-Lattice::~Lattice() {
-
-}
-
-SU3Matrix& Lattice::operator()(int x, int y, int z, int t, int dir) {
-    return U[x][y][z][t][dir];
-}
-const SU3Matrix& Lattice::operator()(int x, int y, int z, int t, int dir) const {
-    return U[x][y][z][t][dir];
-}
-
 // fill U with su3 matrices:
 Lattice fill() {
-    Lattice U;
-    for (int x = 0; x < Ns; x++) {
-        for (int y = 0; y < Ns; y++) {
-            for (int z = 0; z < Ns; z++) {
-                for (int t = 0; t < Nt; t++) {
-                    for (int dir = 0; dir < 4; dir++) {
-                        U(x, y, z, t, dir)= su3_generator();
-                    }
-                }
-            }
+  Lattice U;
+  for (int x = 0; x < Ns; x++) {
+    std::cout << "indices" << x << std::endl;
+    for (int y = 0; y < Ns; y++) {
+      // cout << "indices" << x << y << endl;
+      for (int z = 0; z < Ns; z++) {
+        for (int t = 0; t < Nt; t++) {
+          for (int mu = 0; mu < dir; mu++) {
+            SU3Matrix temp = su3_generator();
+
+            std::cout << "indices" << x << y << z << t << mu << std::endl;
+
+            U(x, y, z, t, mu) = temp;
+          }
         }
+      }
     }
-    return U;
+  }
+  return U;
 }
-void printConfiguration(Lattice U){
-    for (int x = 0; x < su3;x++){
-        for (int y = 0; y < su3; y++){
-            for (int z = 0; z < su3; z++){
-                for (int t = 0; t < su3; t++){
-                    for (int dir = 0; dir < 4; dir++){
-                        for (int a = 0; a < su3; a++){
-                            for (int b = 0; b < su3; b++){
-                                std::cout << U(x, y, z, t, dir)(a, b) << " ";
-                            }
-                        }
-                    }
-                }
+void printConfiguration(Lattice &U) {
+  for (int x = 0; x <= su3; x++) {
+    for (int y = 0; y <= su3; y++) {
+      for (int z = 0; z <= su3; z++) {
+        for (int t = 0; t < su3; t++) {
+          for (int mu = 0; mu < 4; mu++) {
+            std::cout << "This is the determinant" << U(x, y, z, t, mu).det()
+                      << std::endl;
+            std::cout << "Here starts the matrix for" << x << y << z << t << mu
+                      << std::endl;
+            for (int a = 0; a < su3; a++) {
+              for (int b = 0; b < su3; b++) {
+                std::cout << U(x, y, z, t, mu)(a, b) << " ";
+              }
             }
+          }
         }
+      }
     }
+  }
 }
 
 // Tested!!!! Works fine
-// int main(){
-//     Lattice U;
-//     U = fill();
-    
-//     std::cout << "Hello, Diomerdaaaaa!" << std::endl;
-//     // printConfiguration(U);
-//     std::cout << U(0,0,0,0,0)(0, 1) << std::endl;
-//     std::cout << U(0, 1, 1, 3, 0).det() << "queso è il fottuto determinante" << std::endl;
-//     return 0;
-// }
+// int main() {
+//   Lattice U;
+//   U = fill();
+//   return 0;
+// Assuming Ns, Nt, and direction are defined constants
 
+// std::vector<SU3Matrix> innermostVector(dir);
+// std::vector<std::vector<SU3Matrix>> fourthDimension(Nt, innermostVector);
+// std::vector<std::vector<std::vector<SU3Matrix>>> thirdDimension(
+//     Ns, fourthDimension);
+// std::vector<std::vector<std::vector<std::vector<SU3Matrix>>>>
+// secondDimension(
+//     Ns, thirdDimension);
+// std::vector<std::vector<std::vector<std::vector<std::vector<SU3Matrix>>>>>
+//     Conf(Ns, secondDimension);
+
+// for (int x = 0; x < Ns; x++) {
+//   for (int y = 0; y < Ns; y++) {
+//     for (int z = 0; z < Ns; z++) {
+//       for (int t = 0; t < Nt; t++) {
+//         for (int mu = 0; mu < dir; mu++) {
+//           cout << "indices" << x << y << z << t << mu << endl;
+//           SU3Matrix temp = su3_generator();
+//           for (int a = 0; a < su3; a++) {
+//             for (int b = 0; b < su3; b++) {
+//               Conf[x][y][z][t][mu](a, b) = temp(a, b);
+//               cout << Conf[x][y][z][t][mu](a, b) << " ";
+//             }
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
+// }

@@ -10,11 +10,13 @@
 #include "const.h"
 #include "lattice.h"
 
-// execute with command: g++ -g3 -Wall WilsonAction.cpp lattice.cpp
-// SU3Matrix.cpp distributions.cpp su2.cpp -o WilsonAction.exe
+// g++ -g3 -Wall WilsonAction.cpp lattice.cpp SU3Matrix.cpp distributions.cpp
+// su2.cpp -o WilsonAction.exe
 
 vector<int> index(int x, int y, int z, int t, int direct, int l,
                   vector<int> &a_dir, string direction) {
+
+  vector<int> final_dir(4, 0);
 
   if (direction == "f") {
     int xp = (x + l * a_dir[direct]);
@@ -22,7 +24,7 @@ vector<int> index(int x, int y, int z, int t, int direct, int l,
     int zp = (z + l * a_dir[direct]);
     int tp = (t + l * a_dir[direct]);
 
-    return {xp, yp, zp, tp};
+    final_dir = {xp, yp, zp, tp};
   }
 
   if (direction == "b") {
@@ -31,54 +33,69 @@ vector<int> index(int x, int y, int z, int t, int direct, int l,
     int zm = (z - l * a_dir[direct]);
     int tm = (t - l * a_dir[direct]);
 
-    return {xm, ym, zm, tm};
+    final_dir = {xm, ym, zm, tm};
   }
+
+  return final_dir;
 }
 
 void PBC(vector<int> &a_dir) {
-  a_dir[0] = a_dir[0] % Ns;
-  a_dir[1] = a_dir[1] % Ns;
-  a_dir[2] = a_dir[2] % Ns;
-  a_dir[3] = a_dir[3] % Nt;
+  a_dir[0] = positiveMod(a_dir[0], Ns);
+  a_dir[1] = positiveMod(a_dir[1], Ns);
+  a_dir[2] = positiveMod(a_dir[2], Ns);
+  a_dir[3] = positiveMod(a_dir[3], Nt);
+}
+
+int positiveMod(int x, int N) {
+  //*ensures that the modulus operation result is always positive.*/
+
+  int x_pos = (x % N + N) % N;
+  cout << x_pos << endl;
+  return x_pos;
 }
 
 SU3Matrix staple(Lattice U, int x, int y, int z, int t, int mu) {
-  SU3Matrix Wf;
-
+  cout << "scusa ma ci arrivi??" << endl;
   vector<int> a_mu(4, 0);
   a_mu[mu] = 1;
-  vector<int> pmu = index(x, y, z, t, mu, 1, a_mu, "f");
-  vector<int> mmu = index(x, y, z, t, mu, 1, a_mu, "b");
+  SU3Matrix A;
 
   for (int nu = 0; nu < dir; nu++) {
-    vector<int> a_nu(4, 0);
-    a_nu[nu] = 1;
-    vector<int> pnu = index(x, y, z, t, nu, 1, a_nu, "f");
-    vector<int> mnu = index(x, y, z, t, nu, 1, a_nu, "b");
 
-    if (nu == mu) {
+    SU3Matrix A1;
+    SU3Matrix A2;
+
+    if (nu != mu) {
+
+      vector<int> a_nu(4, 0);
+      a_nu[nu] = 1;
+
+      A1 = U((x + a_mu[0]) % Ns, (y + a_mu[1]) % Ns, (z + a_mu[2]) % Ns,
+             (t + a_mu[3]) % Nt, nu) *
+           U((x + a_nu[0]) % Ns, (y + a_nu[1]) % Ns, (z + a_nu[2]) % Ns,
+             (t + a_nu[3]) % Nt, mu)
+               .conjT() *
+           U(x, y, z, t, nu).conjT();
+
+      A2 = U(positiveMod(x + a_mu[0] - a_nu[0], Ns),
+             positiveMod(y + a_mu[1] - a_nu[1], Ns),
+             positiveMod(z + a_mu[2] - a_nu[2], Ns),
+             positiveMod(t + a_mu[3] - a_nu[3], Nt), nu)
+               .conjT() *
+           U(positiveMod(x - a_nu[0], Ns), positiveMod(y - a_nu[1], Ns),
+             positiveMod(z - a_nu[2], Ns), positiveMod(t - a_nu[3], Nt), mu)
+               .conjT() *
+           U(positiveMod(x - a_nu[0], Ns), positiveMod(y - a_nu[1], Ns),
+             positiveMod(z - a_nu[2], Ns), positiveMod(t - a_nu[3], Nt), nu);
+
+      A += A1 + A2;
+    }
+
+    else {
       continue;
     }
-    vector<int> pmu_m_nu =
-        index(pmu[0], pmu[1], pmu[2], pmu[3], nu, 1, a_nu, "b");
-    PBC(pmu);
-    PBC(pmu_m_nu);
-    PBC(mnu);
-    PBC(pnu);
-
-    SU3Matrix W1 = U(pmu[0], pmu[1], pmu[2], pmu[3], nu) *
-                   U(pnu[0], pnu[1], pnu[2], pnu[3], mu) *
-                   (U(x, y, z, t, nu).conjT());
-
-    SU3Matrix W2 =
-        U(pmu_m_nu[0], pmu_m_nu[1], pmu_m_nu[2], pmu_m_nu[3], nu).conjT() *
-        U(mnu[0], mnu[1], mnu[2], mnu[3], mu).conjT() *
-        U(mnu[0], mnu[1], mnu[2], mnu[3], nu);
-
-    Wf += W1 + W2; // should perform Wf += W1+W2
   }
-
-  return Wf;
+  return A;
 }
 
 double Wilson(Lattice &U, int R, int T) {
@@ -176,15 +193,18 @@ double Plaquette(Lattice U) {
                       U(x, y, z, t, nu).conjT();
 
               temp +=
-                  U((x + a_mu[0] - a_nu[0]) % Ns, (y + a_mu[1] - a_nu[1]) % Ns,
-                    (z + a_mu[2] - a_nu[2]) % Ns, (t + a_mu[3] - a_nu[3]) % Nt,
-                    nu)
+                  U(positiveMod(x + a_mu[0] - a_nu[0], Ns),
+                    positiveMod(y + a_mu[1] - a_nu[1], Ns),
+                    positiveMod(z + a_mu[2] - a_nu[2], Ns),
+                    positiveMod(t + a_mu[3] - a_nu[3], Nt), nu)
                       .conjT() *
-                  U((x - a_nu[0]) % Ns, (y - a_nu[1]) % Ns, (z - a_nu[2]) % Ns,
-                    (t - a_nu[3]) % Nt, mu)
+                  U(positiveMod(x - a_nu[0], Ns), positiveMod(y - a_nu[1], Ns),
+                    positiveMod(z - a_nu[2], Ns), positiveMod(t - a_nu[3], Nt),
+                    mu)
                       .conjT() *
-                  U((x - a_nu[0]) % Ns, (y - a_nu[1]) % Ns, (z - a_nu[2]) % Ns,
-                    (t - a_nu[3]) % Nt, nu);
+                  U(positiveMod(x - a_nu[0], Ns), positiveMod(y - a_nu[1], Ns),
+                    positiveMod(z - a_nu[2], Ns), positiveMod(t - a_nu[3], Nt),
+                    nu);
 
               SU3Matrix P = U(x, y, z, t, mu) * temp;
 
@@ -206,12 +226,13 @@ void test(Lattice U) {
 }
 
 // WilsonAction must be recontrolled!
-int main() {
-  std::cout << "first plaquette" << std::endl;
-  Lattice U;
-  U = fill();
-  double cazz = Wilson(U, 1, 1);
-  cout << "questa è la dimensione del tuo cazzo" << cazz << endl;
-  SU3Matrix staplla = staple(U, 0, 0, 0, 0, 0);
-  cout << "questa è la dimensione del tuo bucodiculo" << staplla.reTr() << endl;
-}
+// int main() {
+//   std::cout << "first plaquette" << std::endl;
+//   Lattice U;
+//   U = fill();
+//   double cazz = Wilson(U, 1, 1);
+//   cout << "questa è la dimensione del tuo cazzo" << cazz << endl;
+//   SU3Matrix staplla = staple(U, 0, 0, 0, 0, 0);
+//   cout << "questa è la dimensione del tuo bucodiculo" << staplla.reTr() <<
+//   endl;
+// }

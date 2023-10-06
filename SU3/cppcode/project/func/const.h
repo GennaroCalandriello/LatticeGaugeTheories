@@ -3,13 +3,13 @@
 
 using namespace std;
 
-const double epsilon = 0.2;
+const double epsilon = 0.1;
 const int su3 = 3;
 const int su2 = 2;
-const int Ns = 5;
-const int Nt = 4;
+const int Ns = 20;
+const int Nt = 10;
 const int dir = 4;
-const int R = 3;
-const int T = 3;
+const int R = 1;
+const int T = 1;
 
 #endif // CONST_H

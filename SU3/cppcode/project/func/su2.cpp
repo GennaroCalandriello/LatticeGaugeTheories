@@ -1,4 +1,3 @@
-#include <array>
 #include <complex>
 #include <iostream>
 #include <random>
@@ -12,14 +11,14 @@
 using namespace std;
 using Complex = complex<double>;
 
-// implement parametrized contstructor
-SU2Matrix::SU2Matrix(Matrix &elements) : elements_(elements) {}
+// // implement parametrized contstructor
+// SU2Matrix::SU2Matrix(Matrix &elements) : elements_(elements) {}
 
-// implement destructor
-SU2Matrix::~SU2Matrix() {}
+// // implement destructor
+// SU2Matrix::~SU2Matrix() {}
 
 SU2Matrix SU2Matrix::operator+(const SU2Matrix &other) const {
-  Matrix result;
+  Matrix result(su2, vector<Complex>(su2));
   for (int i = 0; i < su2; i++) {
     for (int j = 0; j < su2; j++) {
       result[i][j] = elements_[i][j] + other.elements_[i][j];
@@ -29,7 +28,7 @@ SU2Matrix SU2Matrix::operator+(const SU2Matrix &other) const {
 }
 
 SU2Matrix SU2Matrix::operator-(const SU2Matrix &other) const {
-  Matrix result;
+  Matrix result(su2, vector<Complex>(su2));
   for (int i = 0; i < su2; i++) {
     for (int j = 0; j < su2; j++) {
       result[i][j] = elements_[i][j] - other.elements_[i][j];
@@ -39,7 +38,7 @@ SU2Matrix SU2Matrix::operator-(const SU2Matrix &other) const {
 }
 
 SU2Matrix SU2Matrix::operator*(const SU2Matrix &other) const {
-  Matrix result;
+  Matrix result(su2, vector<Complex>(su2));
   for (int i = 0; i < su2; i++) {
     for (int j = 0; j < su2; j++) {
       for (int k = 0; k < su2; k++) {
@@ -148,8 +147,8 @@ SU2Matrix su2_generator() {
   }
 
   double x0 = sign * sqrt(1 - pow(epsilon, 2));
-  array<double, 3> r;
-  array<double, 3> r_norm;
+  vector<double> r(3, 0);
+  vector<double> r_norm(3, 0);
   SU2Matrix I = IdentityMat();
 
   for (int i = 0; i < 3; i++) {

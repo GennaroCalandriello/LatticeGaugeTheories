@@ -1,32 +1,26 @@
-// Include guards to prevent double inclusion
 #ifndef SU2_MATRIX_H
 #define SU2_MATRIX_H
 
-// Necessary includes
 #include "const.h"
-#include <array>
 #include <complex>
+#include <vector>
+
 
 using namespace std;
 using Complex = complex<double>;
 
 class SU2Matrix {
 public:
-  using Matrix = array<array<Complex, 2>, 2>;
+  using Matrix = vector<vector<Complex>>;
 
   // default constructor
-  SU2Matrix() {
-    for (int i = 0; i < su2; i++) {
-      for (int j = 0; j < su2; j++) {
-        elements_[i][j] = Complex(0.0, 0.0);
-      }
-    }
-  };
+  SU2Matrix() : elements_(su2, vector<Complex>(su2, Complex(0.0, 0.0))){};
 
-  // Constructor that takes a Matrix as a parameter (PARAMETRIC CONSTRUCTOR)
-  SU2Matrix(Matrix &elements);
+  // Constructor that takes a Matrix as a parameter
+  SU2Matrix(const Matrix &elements) : elements_(elements) {}
+
   // destructor
-  ~SU2Matrix();
+  ~SU2Matrix() {}
 
   SU2Matrix operator+(const SU2Matrix &other) const;
   SU2Matrix operator-(const SU2Matrix &other) const;

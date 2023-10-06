@@ -12,17 +12,16 @@
 using namespace std;
 using Complex = complex<double>;
 
-// to compile all the files included the command is: g++ -g3 -Wall SU3Matrix.cpp
-// su2.cpp distributions.cpp -o SU3Matrix.exe
+// g++ -g3 -Wall SU3Matrix.cpp su2.cpp distributions.cpp -o SU3Matrix.exe
 
 // implement parametrized constructor
-SU3Matrix::SU3Matrix(const Matrix &elements) : elements_(elements) {}
+// SU3Matrix::SU3Matrix(const Matrix &elements) : elements_(elements) {}
 
 // implement destructor
-SU3Matrix::~SU3Matrix() {}
+// SU3Matrix::~SU3Matrix() {}
 
 SU3Matrix SU3Matrix::operator+(const SU3Matrix &other) const {
-  Matrix result;
+  Matrix result(su3, vector<Complex>(su3));
   for (int i = 0; i < su3; i++) {
     for (int j = 0; j < su3; j++) {
       result[i][j] = elements_[i][j] + other.elements_[i][j];
@@ -32,7 +31,7 @@ SU3Matrix SU3Matrix::operator+(const SU3Matrix &other) const {
 }
 
 SU3Matrix SU3Matrix::operator-(const SU3Matrix &other) const {
-  Matrix result;
+  Matrix result(su3, vector<Complex>(su3));
   for (int i = 0; i < su3; i++) {
     for (int j = 0; j < su3; j++)
       result[i][j] = elements_[i][j] - other.elements_[i][j];
@@ -41,7 +40,7 @@ SU3Matrix SU3Matrix::operator-(const SU3Matrix &other) const {
 }
 
 SU3Matrix SU3Matrix::operator*(const SU3Matrix &other) const {
-  Matrix result;
+  Matrix result(su3, vector<Complex>(su3));
   for (int i = 0; i < su3; i++) {
     for (int j = 0; j < su3; j++) {
       for (int k = 0; k < su3; k++) {
@@ -56,7 +55,7 @@ SU3Matrix SU3Matrix::operator*(const SU3Matrix &other) const {
 SU3Matrix &SU3Matrix::operator+=(const SU3Matrix &rhs) {
   for (int i = 0; i < su3; ++i) {
     for (int j = 0; j < su3; ++j) {
-      elements_[i][j] += rhs.elements_[i][j];
+      this->elements_[i][j] += rhs.elements_[i][j];
     }
   }
   return *this;
@@ -85,8 +84,8 @@ Complex &SU3Matrix::operator()(int row, int col) {
 }
 
 void SU3Matrix::print() const {
-  for (const auto &row : elements_) {
-    for (const auto &element : row) {
+  for (const vector<Complex> &row : elements_) {
+    for (const Complex &element : row) {
       cout << element << " ";
     }
     cout << endl;
@@ -94,7 +93,7 @@ void SU3Matrix::print() const {
 }
 
 SU3Matrix SU3Matrix::conjT() const {
-  Matrix result = {};
+  Matrix result(3, vector<Complex>(3));
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       result[i][j] = std::conj(elements_[j][i]);
@@ -140,6 +139,13 @@ SU3Matrix IdentityMatrix() {
   }
   return identity;
 }
+void SU3Matrix::zeros() {
+  for (int i = 0; i < su3; i++) {
+    for (int j = 0; j < su3; j++) {
+      elements_[i][j] = Complex(0.0, 0.0);
+    }
+  }
+}
 
 SU3Matrix su3_generator() {
 
@@ -183,6 +189,6 @@ SU3Matrix su3_generator() {
 //   for (int i = 0; i < 100; i++) {
 //     SU3Matrix prova = su3_generator();
 //     cout << "fineeee" << endl;
-//     cout << prova.reTr() << endl;
+//     prova.print();
 //   }
 // }

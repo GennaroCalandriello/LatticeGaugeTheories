@@ -1,11 +1,11 @@
 #ifndef SU3MATRIX_H
 #define SU3MATRIX_H
 
-#include <array>
 #include <complex>
 #include <ctime>
 #include <iostream>
 #include <random>
+#include <vector>
 
 #include "const.h"
 
@@ -14,23 +14,17 @@ using Complex = complex<double>;
 
 class SU3Matrix {
 public:
-  using Matrix = array<array<Complex, su3>, su3>;
+  using Matrix = vector<vector<Complex>>;
 
-  // default construnctor
-  SU3Matrix() {
-    // initialize elements to produce a default constructor
-    for (int i = 0; i < su3; i++) {
-      for (int j = 0; j < su3; j++) {
-        elements_[i][j] = Complex(0.0, 0.0);
-      }
-    }
-  };
+  // default constructor
+  SU3Matrix() : elements_(su3, vector<Complex>(su3, Complex(0.0, 0.0))) {}
 
   // Constructor that takes a Matrix as a parameter (PARAMETRIC CONSTRUCTOR)
   // in C++ it is possible to declare multiple constructors
-  SU3Matrix(const Matrix &elements);
+  SU3Matrix(Matrix &elements) : elements_(elements) {}
+
   // destructor
-  ~SU3Matrix();
+  ~SU3Matrix() {}
 
   SU3Matrix operator+(const SU3Matrix &other) const;
   SU3Matrix operator-(const SU3Matrix &other) const;
@@ -38,8 +32,10 @@ public:
   SU3Matrix &operator+=(const SU3Matrix &rhs);
   SU3Matrix &operator*=(const SU3Matrix &rhs);
   Complex &operator()(int row, int col);
+  void zeros();
 
   void print() const;
+
   SU3Matrix conjT() const;
   Complex det() const;
   Complex tr() const;

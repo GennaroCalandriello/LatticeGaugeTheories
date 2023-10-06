@@ -9,11 +9,12 @@
 
 using namespace std;
 
-SU3Matrix staple(Lattice U, int x, int y, int z, int t, int dir);
+SU3Matrix staple(Lattice U, int x, int y, int z, int t, int mu);
 vector<int> index(int x, int y, int z, int t, int dir, int l,
                   vector<int> &a_dir, const string direction);
 void PBC(vector<int> &a_dir);
 double Wilson(Lattice &U, const int R, const int T);
 double Plaquette(Lattice U);
+int positiveMod(int x, int N);
 
 #endif // WILSONACTION_H
