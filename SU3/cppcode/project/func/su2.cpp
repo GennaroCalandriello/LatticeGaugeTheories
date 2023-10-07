@@ -24,7 +24,7 @@ SU2Matrix SU2Matrix::operator+(const SU2Matrix &other) const {
       result[i][j] = elements_[i][j] + other.elements_[i][j];
     }
   }
-  return *this;
+  return SU2Matrix(result);
 }
 
 SU2Matrix SU2Matrix::operator-(const SU2Matrix &other) const {
@@ -34,7 +34,7 @@ SU2Matrix SU2Matrix::operator-(const SU2Matrix &other) const {
       result[i][j] = elements_[i][j] - other.elements_[i][j];
     }
   }
-  return *this;
+  return SU2Matrix(result);
 }
 
 SU2Matrix SU2Matrix::operator*(const SU2Matrix &other) const {
@@ -46,7 +46,7 @@ SU2Matrix SU2Matrix::operator*(const SU2Matrix &other) const {
       }
     }
   }
-  return *this;
+  return SU2Matrix(result);
 }
 
 SU2Matrix &SU2Matrix::operator+=(const SU2Matrix &rhs) {
@@ -90,13 +90,13 @@ void SU2Matrix::print() const {
 }
 
 SU2Matrix SU2Matrix::conjT() const {
-  Matrix result = {};
+  Matrix result(su2, vector<Complex>(su2));
   for (int i = 0; i < su2; i++) {
     for (int j = 0; j < su2; j++) {
       result[i][j] = std::conj(elements_[j][i]);
     }
   }
-  return *this;
+  return SU2Matrix(result);
 }
 
 Complex SU2Matrix::det() const {

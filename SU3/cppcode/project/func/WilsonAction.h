@@ -15,6 +15,6 @@ vector<int> index(int x, int y, int z, int t, int dir, int l,
 void PBC(vector<int> &a_dir);
 double Wilson(Lattice &U, const int R, const int T);
 double Plaquette(Lattice U);
-int positiveMod(int x, int N);
+int posMod(int x, int N);
 
 #endif // WILSONACTION_H

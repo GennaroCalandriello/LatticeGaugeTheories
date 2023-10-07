@@ -27,7 +27,7 @@ SU3Matrix SU3Matrix::operator+(const SU3Matrix &other) const {
       result[i][j] = elements_[i][j] + other.elements_[i][j];
     }
   }
-  return *this;
+  return SU3Matrix(result);
 }
 
 SU3Matrix SU3Matrix::operator-(const SU3Matrix &other) const {
@@ -36,7 +36,7 @@ SU3Matrix SU3Matrix::operator-(const SU3Matrix &other) const {
     for (int j = 0; j < su3; j++)
       result[i][j] = elements_[i][j] - other.elements_[i][j];
   }
-  return *this;
+  return SU3Matrix(result);
 }
 
 SU3Matrix SU3Matrix::operator*(const SU3Matrix &other) const {
@@ -48,7 +48,7 @@ SU3Matrix SU3Matrix::operator*(const SU3Matrix &other) const {
       }
     }
   }
-  return result;
+  return SU3Matrix(result);
 }
 
 // Addition assignment operator
@@ -94,12 +94,12 @@ void SU3Matrix::print() const {
 
 SU3Matrix SU3Matrix::conjT() const {
   Matrix result(3, vector<Complex>(3));
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
+  for (int i = 0; i < su3; i++) {
+    for (int j = 0; j < su3; j++) {
       result[i][j] = std::conj(elements_[j][i]);
     }
   }
-  return *this;
+  return SU3Matrix(result);
 }
 
 Complex SU3Matrix::det() const {

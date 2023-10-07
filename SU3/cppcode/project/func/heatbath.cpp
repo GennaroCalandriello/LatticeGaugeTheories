@@ -11,7 +11,7 @@
 #include "lattice.h"
 #include "su2.h"
 
-// g++ -g3 -Wall heatbath.cpp lattice.cpp SU3Matrix.cpp su2.cpp
+// g++ -O3 -g3 -Wall heatbath.cpp lattice.cpp SU3Matrix.cpp su2.cpp
 // distributions.cpp WilsonAction.cpp -o heatbath.exe
 
 using namespace std;
@@ -20,7 +20,7 @@ using Complex = complex<double>;
 Heatbath::Heatbath() {}
 Heatbath::~Heatbath() {}
 
-void Heatbath::HB_update(Lattice &U, double beta) {
+void Heatbath::HB_update(Lattice &U, const double beta) {
 
   for (int x = 0; x < Ns; x++) {
 
@@ -29,6 +29,7 @@ void Heatbath::HB_update(Lattice &U, double beta) {
       for (int z = 0; z < Ns; z++) {
         for (int t = 0; t < Nt; t++) {
           for (int mu = 0; mu < dir; mu++) {
+            // cout << "updating site " << x << y << z << t << mu << endl;
 
             SU3Matrix A = staple(U, x, y, z, t, mu);
             SU3Matrix Utemp = U(x, y, z, t, mu);
@@ -46,25 +47,23 @@ void Heatbath::HB_update(Lattice &U, double beta) {
                                             {{0, 0, 1}}}};
               SU3Matrix R(R_elems);
 
-              W *= R;
+              SU3Matrix W1 = R * W;
 
-              SU2Matrix s_ = heatbath_subgroup(W, beta, "s");
+              SU2Matrix s_ = heatbath_subgroup(W1, beta, "s");
               SU3Matrix::Matrix S_elems = {{{{s_(0, 0), 0, s_(0, 1)}},
                                             {{0, 1, 0}},
                                             {{s_(1, 0), 0, s_(1, 1)}}}};
               SU3Matrix S(S_elems);
 
-              W *= S;
+              SU3Matrix W2 = S * W1;
 
-              SU2Matrix t_ = heatbath_subgroup(W, beta, "t");
+              SU2Matrix t_ = heatbath_subgroup(W2, beta, "t");
               SU3Matrix::Matrix T_elems = {{{{1, 0, 0}},
                                             {{0, t_(0, 0), t_(0, 1)}},
                                             {{0, t_(1, 0), t_(1, 1)}}}};
               SU3Matrix T(T_elems);
               SU3Matrix Uprime = T * S * R * Utemp;
               U(x, y, z, t, mu) = Uprime;
-
-              cout << "dopo" << U(x, y, z, t, mu).reTr() << endl;
             }
 
             else {
@@ -78,7 +77,7 @@ void Heatbath::HB_update(Lattice &U, double beta) {
   }
 }
 
-SU2Matrix Heatbath::heatbath_subgroup(SU3Matrix W, double beta,
+SU2Matrix Heatbath::heatbath_subgroup(SU3Matrix W, const double beta,
                                       const string subgrp) {
 
   SU2Matrix Wsub;
@@ -105,9 +104,11 @@ SU2Matrix Heatbath::heatbath_subgroup(SU3Matrix W, double beta,
   SU2Matrix return_matrix;
 
   if (a != 0) {
-    vector<double> avec = sampleA(a, beta);
+    vector<double> avec = sampleA(a, 2 * beta / 3);
     SU2Matrix a_quat = quaternion(avec);
+
     SU2Matrix Wsub_new = a_quat * wbar.conjT();
+
     return_matrix = Wsub_new;
   }
 
@@ -160,19 +161,23 @@ vector<double> Heatbath::normalize(vector<double> v) {
   return v_norm;
 }
 
-vector<double> Heatbath::sampleA(double a, double beta) {
+vector<double> Heatbath::sampleA(double a, const double beta) {
 
   /**choose a0 with P(a0) \sim sqrt(1-a0^2)* exp(beta*k* a0)
    */
 
-  double e = exp(-2 * beta * a);
-  double xtrial = uniform_(0, 1) * (1 - e) + e;
-  double a0 = 1 + log(xtrial) / (beta * a);
+  // do {
+  // 	double xtrial = randUnif()*(1.0 - w) + w;
+  // 	a0 = 1 + log(xtrial)/(beta * k);
+  // } while(sqrt(1-a0*a0) < randUnif());
 
-  while (sqrt(1 - a0 * a0) < uniform_(0, 1)) {
-    xtrial = uniform_(0, 1) * (1 - e) + e;
+  double e = exp(-2 * beta * a);
+  double a0;
+
+  do {
+    double xtrial = uniform_(0, 1) * (1.0 - e) + e;
     a0 = 1 + log(xtrial) / (beta * a);
-  }
+  } while (sqrt(1 - a0 * a0) < uniform_(0, 1));
 
   double r = sqrt(1 - a0 * a0);
   double a1 = gauss_(0, 1);
@@ -193,16 +198,18 @@ vector<double> Heatbath::sampleA(double a, double beta) {
 
 // testing
 int main() {
-  cout << "quest è nu testt" << endl;
-  Lattice U;
-  U = fill();
+  Heatbath hb;
+
+  Lattice U = fill();
   double W1 = Wilson(U, 1, 1);
-  cout << "Wilson action prima" << W1 << endl;
-  Heatbath HB;
-  for (int i = 0; i < 15; i++) {
-    cout << "HB num. " << i << endl;
-    HB.HB_update(U, 1);
+  cout << "W1 " << W1 << endl;
+  double P = Plaquette(U);
+  cout << "P" << P << endl;
+  for (int x = 0; x < 150; x++) {
+    cout << "beat " << x << endl;
+    hb.HB_update(U, 3);
   }
   double W2 = Wilson(U, 1, 1);
-  cout << "Wilson action dopo" << W2 << endl;
+
+  cout << "W2 " << W2 << endl;
 }

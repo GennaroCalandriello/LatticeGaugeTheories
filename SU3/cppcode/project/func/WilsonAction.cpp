@@ -40,17 +40,18 @@ vector<int> index(int x, int y, int z, int t, int direct, int l,
 }
 
 void PBC(vector<int> &a_dir) {
-  a_dir[0] = positiveMod(a_dir[0], Ns);
-  a_dir[1] = positiveMod(a_dir[1], Ns);
-  a_dir[2] = positiveMod(a_dir[2], Ns);
-  a_dir[3] = positiveMod(a_dir[3], Nt);
+  a_dir[0] = posMod(a_dir[0], Ns);
+  a_dir[1] = posMod(a_dir[1], Ns);
+  a_dir[2] = posMod(a_dir[2], Ns);
+  a_dir[3] = posMod(a_dir[3], Nt);
 }
 
-int positiveMod(int x, int N) {
+int posMod(int x, int N) {
   //*ensures that the modulus operation result is always positive.*/
 
   int x_pos = (x % N + N) % N;
-  return x_pos;
+  // int x_pos = x % N;
+  return abs(x_pos);
 }
 
 SU3Matrix staple(Lattice U, int x, int y, int z, int t, int mu) {
@@ -60,33 +61,33 @@ SU3Matrix staple(Lattice U, int x, int y, int z, int t, int mu) {
 
   for (int nu = 0; nu < dir; nu++) {
 
-    SU3Matrix A1;
-    SU3Matrix A2;
+    // SU3Matrix A1;
+    // SU3Matrix A2;
 
-    if (nu != mu) {
+    if (mu != nu) {
 
       vector<int> a_nu(4, 0);
       a_nu[nu] = 1;
 
-      A1 = U((x + a_mu[0]) % Ns, (y + a_mu[1]) % Ns, (z + a_mu[2]) % Ns,
+      A += U((x + a_mu[0]) % Ns, (y + a_mu[1]) % Ns, (z + a_mu[2]) % Ns,
              (t + a_mu[3]) % Nt, nu) *
            U((x + a_nu[0]) % Ns, (y + a_nu[1]) % Ns, (z + a_nu[2]) % Ns,
              (t + a_nu[3]) % Nt, mu)
                .conjT() *
            U(x, y, z, t, nu).conjT();
 
-      A2 = U(positiveMod(x + a_mu[0] - a_nu[0], Ns),
-             positiveMod(y + a_mu[1] - a_nu[1], Ns),
-             positiveMod(z + a_mu[2] - a_nu[2], Ns),
-             positiveMod(t + a_mu[3] - a_nu[3], Nt), nu)
+      A += U(posMod(x + a_mu[0] - a_nu[0], Ns),
+             posMod(y + a_mu[1] - a_nu[1], Ns),
+             posMod(z + a_mu[2] - a_nu[2], Ns),
+             posMod(t + a_mu[3] - a_nu[3], Nt), nu)
                .conjT() *
-           U(positiveMod(x - a_nu[0], Ns), positiveMod(y - a_nu[1], Ns),
-             positiveMod(z - a_nu[2], Ns), positiveMod(t - a_nu[3], Nt), mu)
+           U(posMod(x - a_nu[0], Ns), posMod(y - a_nu[1], Ns),
+             posMod(z - a_nu[2], Ns), posMod(t - a_nu[3], Nt), mu)
                .conjT() *
-           U(positiveMod(x - a_nu[0], Ns), positiveMod(y - a_nu[1], Ns),
-             positiveMod(z - a_nu[2], Ns), positiveMod(t - a_nu[3], Nt), nu);
+           U(posMod(x - a_nu[0], Ns), posMod(y - a_nu[1], Ns),
+             posMod(z - a_nu[2], Ns), posMod(t - a_nu[3], Nt), nu);
 
-      A += A1 + A2;
+      // A += A1 + A2;
     }
 
     else {
@@ -117,38 +118,36 @@ double Wilson(Lattice &U, int R, int T) {
               for (int i = 0; i < R; i++) {
 
                 // U[r+i*a_mu]
-                vector<int> p = index(x, y, z, t, mu, i, a_mu, "f");
-                PBC(p);
-                I *= U(p[0], p[1], p[2], p[3], mu);
+                I *= U(posMod(x + i * a_mu[0], Ns), posMod(y + i * a_mu[1], Ns),
+                       posMod(z + i * a_mu[2], Ns), posMod(t + i * a_mu[3], Nt),
+                       mu);
               }
               for (int j = 0; j < T; j++) {
 
                 // U[r+j*a_nu+T*a_mu]
-                vector<int> p = index(x, y, z, t, nu, j, a_nu, "f");
-                vector<int> pT =
-                    index(p[0], p[1], p[2], p[3], mu, T, a_mu, "f");
-                PBC(pT);
-
-                I *= U(pT[0], pT[1], pT[2], pT[3], nu);
+                I *= U(posMod(x + j * a_nu[0] + T * a_mu[0], Ns),
+                       posMod(y + j * a_nu[1] + T * a_mu[1], Ns),
+                       posMod(z + j * a_nu[2] + T * a_mu[2], Ns),
+                       posMod(t + j * a_nu[3] + T * a_mu[3], Nt), nu);
               }
 
               for (int i = R - 1; i >= 0; i--) {
 
-                // U[r+i*a_mu+R*a_nu]
-                vector<int> p = index(x, y, z, t, mu, i, a_mu, "f");
-                vector<int> pR =
-                    index(p[0], p[1], p[2], p[3], nu, R, a_nu, "f");
-                PBC(pR);
-
-                I *= U(pR[0], pR[1], pR[2], pR[3], mu).conjT();
+                // U[r+i*a_mu+R*a_nu].conjT()
+                I *= U(posMod(x + i * a_mu[0] + R * a_nu[0], Ns),
+                       posMod(y + i * a_mu[1] + R * a_nu[1], Ns),
+                       posMod(z + i * a_mu[2] + R * a_nu[2], Ns),
+                       posMod(t + i * a_mu[3] + R * a_nu[3], Nt), mu)
+                         .conjT();
               }
 
               for (int j = T - 1; j >= 0; j--) {
 
-                // U[r+j*a_nu]
-                vector<int> p = index(x, y, z, t, nu, j, a_nu, "f");
-                PBC(p);
-                I *= U(p[0], p[1], p[2], p[3], nu).conjT();
+                // U[r+j*a_nu].conjT()
+                I *= U(posMod(x + j * a_nu[0], Ns), posMod(y + j * a_nu[1], Ns),
+                       posMod(z + j * a_nu[2], Ns), posMod(t + j * a_nu[3], Nt),
+                       nu)
+                         .conjT();
               }
 
               S += I.reTr() / su3;
@@ -174,35 +173,31 @@ double Plaquette(Lattice U) {
             vector<int> a_mu(4, 0);
             a_mu[mu] = 1;
 
-            for (int nu = 0; nu < dir; nu++) {
+            for (int nu = mu + 1; nu < dir; nu++) {
               if (nu == mu) {
                 continue;
               }
-
               SU3Matrix temp;
               vector<int> a_nu(4, 0);
               a_nu[nu] = 1;
 
-              temp += U((x + a_mu[0]) % Ns, (y + a_mu[1]) % Ns,
-                        (z + a_mu[2]) % Ns, (t + a_mu[3]) % Nt, nu) *
-                      U((x + a_nu[0]) % Ns, (y + a_nu[1]) % Ns,
-                        (z + a_nu[2]) % Ns, (t + a_nu[3]) % Nt, mu)
+              temp += U(posMod(x + a_mu[0], Ns), posMod(y + a_mu[1], Ns),
+                        posMod(z + a_mu[2], Ns), posMod(t + a_mu[3], Nt), nu) *
+                      U(posMod(x + a_nu[0], Ns), posMod(y + a_nu[1], Ns),
+                        posMod(z + a_nu[2], Ns), posMod(t + a_nu[3], Nt), mu)
                           .conjT() *
                       U(x, y, z, t, nu).conjT();
 
-              temp +=
-                  U(positiveMod(x + a_mu[0] - a_nu[0], Ns),
-                    positiveMod(y + a_mu[1] - a_nu[1], Ns),
-                    positiveMod(z + a_mu[2] - a_nu[2], Ns),
-                    positiveMod(t + a_mu[3] - a_nu[3], Nt), nu)
-                      .conjT() *
-                  U(positiveMod(x - a_nu[0], Ns), positiveMod(y - a_nu[1], Ns),
-                    positiveMod(z - a_nu[2], Ns), positiveMod(t - a_nu[3], Nt),
-                    mu)
-                      .conjT() *
-                  U(positiveMod(x - a_nu[0], Ns), positiveMod(y - a_nu[1], Ns),
-                    positiveMod(z - a_nu[2], Ns), positiveMod(t - a_nu[3], Nt),
-                    nu);
+              temp += U(posMod(x + a_mu[0] - a_nu[0], Ns),
+                        posMod(y + a_mu[1] - a_nu[1], Ns),
+                        posMod(z + a_mu[2] - a_nu[2], Ns),
+                        posMod(t + a_mu[3] - a_nu[3], Nt), nu)
+                          .conjT() *
+                      U(posMod(x - a_nu[0], Ns), posMod(y - a_nu[1], Ns),
+                        posMod(z - a_nu[2], Ns), posMod(t - a_nu[3], Nt), mu)
+                          .conjT() *
+                      U(posMod(x - a_nu[0], Ns), posMod(y - a_nu[1], Ns),
+                        posMod(z - a_nu[2], Ns), posMod(t - a_nu[3], Nt), nu);
 
               SU3Matrix P = U(x, y, z, t, mu) * temp;
 
