@@ -36,6 +36,7 @@ public:
   SU3Matrix &operator+=(const SU3Matrix &rhs);
   SU3Matrix &operator*=(const SU3Matrix &rhs);
   SU3Matrix matrixSqrt() const;
+  SU3Matrix eigenvectors() const;
   SU3Matrix inv();
 
   Complex &operator()(int row, int col);

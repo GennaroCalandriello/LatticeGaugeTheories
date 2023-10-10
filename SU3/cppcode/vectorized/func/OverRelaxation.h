@@ -20,8 +20,8 @@ public:
   overrelaxation();
   ~overrelaxation();
   void OR_update(Lattice &U);
-  void reflection(SU3Matrix &Ulink);
+  SU3Matrix &reflection(SU3Matrix &Ulink);
   void check_su3(SU3Matrix &Ulink);
-}
+};
 
 #endif // OVERRELAXATION_H

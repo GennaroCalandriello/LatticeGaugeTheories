@@ -230,6 +230,29 @@ double SU3Matrix::reTr() const {
   }
   return realTrace;
 }
+
+SU3Matrix SU3Matrix::eigenvectors() const {
+  Eigen::Matrix3cd eigenMatrix;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      eigenMatrix(i, j) = this->operator()(i, j);
+    }
+  }
+
+  // Step 2: Compute the matrix square root using Eigen
+  Eigen::ComplexEigenSolver<Eigen::Matrix3cd> solver(eigenMatrix);
+  Eigen::Matrix3cd V = solver.eigenvectors();
+
+  // Step 3: Convert the result back to SU3Matrix format and return
+  Matrix EV(su3, std::vector<Complex>(su3));
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      EV[i][j] = V(i, j);
+    }
+  }
+  return SU3Matrix(EV);
+}
+
 SU3Matrix SU3Matrix::matrixSqrt() const {
   // Step 1: Convert this SU3Matrix to Eigen::Matrix3cd
   Eigen::Matrix3cd eigenMatrix;
@@ -348,11 +371,11 @@ SU3Matrix su3_generator() {
 }
 
 // // // // // TESTED AND WORKS FINE
-int main() {
+// int main() {
 
-  for (int i = 0; i < 2; i++) {
-    SU3Matrix prova = IdentityMatrix() * 0.5;
-    SU3Matrix sqr = prova.matrixSqrt();
-    sqr.print();
-  }
-}
+//   for (int i = 0; i < 2; i++) {
+//     SU3Matrix prova = IdentityMatrix() * 0.5;
+//     SU3Matrix sqr = prova.matrixSqrt();
+//     sqr.print();
+//   }
+// }

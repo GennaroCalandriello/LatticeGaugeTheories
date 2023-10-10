@@ -270,35 +270,35 @@ SU3Matrix Heatbath::staple(Lattice U, int x, int y, int z, int t, int mu) {
 }
 
 // testing
-int main() {
-  cout << "Ns = " << Ns << endl;
-  cout << "Nt = " << Nt << endl;
+// int main() {
+//   cout << "Ns = " << Ns << endl;
+//   cout << "Nt = " << Nt << endl;
 
-  auto start = std::chrono::high_resolution_clock::now();
-  Heatbath hb;
+//   auto start = std::chrono::high_resolution_clock::now();
+//   Heatbath hb;
 
-  Lattice U = fill();
+//   Lattice U = fill();
 
-  // time
-  auto stop = std::chrono::high_resolution_clock::now();
-  auto duration =
-      std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-  cout << "filling lattice took " << duration.count() << " seconds" << endl;
+//   // time
+//   auto stop = std::chrono::high_resolution_clock::now();
+//   auto duration =
+//       std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+//   cout << "filling lattice took " << duration.count() << " seconds" << endl;
 
-  for (int x = 0; x < 20; x++) {
-    cout << "beat " << x << endl;
+//   for (int x = 0; x < 20; x++) {
+//     cout << "beat " << x << endl;
 
-    auto start = std::chrono::high_resolution_clock::now();
-    hb.HB_update(U, 7);
-    auto stop = std::chrono::high_resolution_clock::now();
+//     auto start = std::chrono::high_resolution_clock::now();
+//     hb.HB_update(U, 7);
+//     auto stop = std::chrono::high_resolution_clock::now();
 
-    auto duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << duration.count() << " milliseconds" << endl;
-  }
-  double W2 = Wilson(U, 4, 4);
-  double W1 = Wilson(U, 1, 1);
+//     auto duration =
+//         std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+//     std::cout << duration.count() << " milliseconds" << endl;
+//   }
+//   double W2 = Wilson(U, 4, 4);
+//   double W1 = Wilson(U, 1, 1);
 
-  cout << "W1 " << W1 << endl;
-  cout << "W2 " << W2 << endl;
-}
+//   cout << "W1 " << W1 << endl;
+//   cout << "W2 " << W2 << endl;
+// }
