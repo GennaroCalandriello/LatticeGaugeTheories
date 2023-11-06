@@ -17,6 +17,7 @@
 #include "lattice.h"
 #include "su2.h"
 
+// gno gno
 using namespace std;
 // g++ -fopenmp -g3 -Wall -I/eigen/Eigen gradientflow.cpp SU3Matrix.cpp
 // lattice.cpp WilsonAction.cpp heatbath.cpp su2.cpp distributions.cpp -o
