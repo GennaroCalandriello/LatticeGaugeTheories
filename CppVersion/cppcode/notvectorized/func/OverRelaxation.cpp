@@ -146,6 +146,7 @@ void overrelaxation::OR_update(Lattice &U) {
             SU3Matrix O = A * H.inv();
             cout << "dett" << O.det() << endl;
             // O.unitarize();
+            O.gramSchmidtQR();
             double det_O = (O.det()).real();
             int det_O_round = static_cast<int>(std::round(det_O));
             // cout << "det_O_round " << det_O << endl;

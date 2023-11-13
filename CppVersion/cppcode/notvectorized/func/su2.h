@@ -5,7 +5,6 @@
 #include <complex>
 #include <vector>
 
-
 using namespace std;
 using Complex = complex<double>;
 
@@ -25,8 +24,12 @@ public:
   SU2Matrix operator+(const SU2Matrix &other) const;
   SU2Matrix operator-(const SU2Matrix &other) const;
   SU2Matrix operator*(const SU2Matrix &other) const;
+  SU2Matrix operator*(const Complex &rhs) const;
+  SU2Matrix operator*(const double &rhs) const;
   SU2Matrix &operator+=(const SU2Matrix &rhs);
   SU2Matrix &operator*=(const SU2Matrix &rhs);
+  SU2Matrix &operator/=(const Complex &rhs); // scalar division
+  SU2Matrix &operator/=(const double &rhs);  // scalar division
   Complex &operator()(int row, int col);
 
   void print() const;

@@ -5,16 +5,20 @@ wilson = np.loadtxt("func/Wilson11.txt")
 topological = np.loadtxt("func/TopologicalCharge.txt")
 Nstep = len(wilson)
 
-plt.figure()
-plt.scatter(np.arange(Nstep), wilson, label="Wilson", color="blue", marker="+")
+plt.figure(figsize=(10, 10))
+plt.scatter(np.arange(Nstep), 1- wilson, label="Wilson", color="blue", marker="+")
+plt.title("Wilson, Cooling")
+plt.xlabel("Nstep")
+plt.ylabel(r"$\langle W \rangle$")
+plt.grid(True)
 plt.show()
 
-plt.figure()
+plt.figure(figsize=(10, 10))
 plt.scatter(
     np.arange(Nstep), topological, label="Topological Charge", color="red", marker="+"
 )
-plt.show()
-
-plt.figure()
-plt.hist(topological, bins=10, label="Topological Charge", color="red")
+plt.title("Topological Charge, Cooling")
+plt.xlabel("Nstep")
+plt.ylabel("Q")
+plt.grid(True)
 plt.show()

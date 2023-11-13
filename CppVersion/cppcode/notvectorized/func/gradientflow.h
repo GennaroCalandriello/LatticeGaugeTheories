@@ -11,7 +11,7 @@ public:
   Flow();
   ~Flow();
   void Flow_update(Lattice &U);
-  SU3Matrix ActionDerivative(SU3Matrix const Omega, SU3Matrix const Ulink);
+  SU3Matrix ActionDerivative(SU3Matrix const Omega);
   double TopologicalCharge(Lattice &U);
   int epsilon(int mu, int nu, int rho, int sigma);
   int sign(int x);

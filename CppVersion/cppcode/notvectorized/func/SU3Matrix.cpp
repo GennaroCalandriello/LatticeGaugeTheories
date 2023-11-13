@@ -1,4 +1,4 @@
-#include "Eigen/Dense"
+// #include "Eigen/Dense"
 #include <array>
 #include <complex>
 #include <ctime>
@@ -162,6 +162,13 @@ SU3Matrix &SU3Matrix::operator*=(const Complex &rhs) {
   return *this;
 }
 
+SU3Matrix &SU3Matrix::operator/=(const Complex &rhs) {
+  SU3Matrix result;
+  result = (*this) / rhs;
+  (*this) = result;
+  return *this;
+}
+
 Complex &SU3Matrix::operator()(int row, int col) {
   if (row >= 0 && row < 3 && col >= 0 && col < 3) {
     return elements_[row][col];
@@ -237,58 +244,84 @@ double SU3Matrix::reTr() const {
   }
   return realTrace;
 }
+// USE OF
+// EIGEN------------------------------------------------------------------
+// SU3Matrix SU3Matrix::eigenvectors() const {
+//   Eigen::Matrix3cd eigenMatrix;
+//   for (int i = 0; i < 3; i++) {
+//     for (int j = 0; j < 3; j++) {
+//       eigenMatrix(i, j) = this->operator()(i, j);
+//     }
+//   }
 
-SU3Matrix SU3Matrix::eigenvectors() const {
-  Eigen::Matrix3cd eigenMatrix;
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      eigenMatrix(i, j) = this->operator()(i, j);
-    }
-  }
+//   // Step 2: Compute the matrix square root using Eigen
+//   Eigen::ComplexEigenSolver<Eigen::Matrix3cd> solver(eigenMatrix);
+//   Eigen::Matrix3cd V = solver.eigenvectors();
 
-  // Step 2: Compute the matrix square root using Eigen
-  Eigen::ComplexEigenSolver<Eigen::Matrix3cd> solver(eigenMatrix);
-  Eigen::Matrix3cd V = solver.eigenvectors();
+//   // Step 3: Convert the result back to SU3Matrix format and return
+//   Matrix EV(su3, std::vector<Complex>(su3));
+//   for (int i = 0; i < 3; i++) {
+//     for (int j = 0; j < 3; j++) {
+//       EV[i][j] = V(i, j);
+//     }
+//   }
+//   return SU3Matrix(EV);
+// }
 
-  // Step 3: Convert the result back to SU3Matrix format and return
-  Matrix EV(su3, std::vector<Complex>(su3));
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      EV[i][j] = V(i, j);
-    }
-  }
-  return SU3Matrix(EV);
-}
+// SU3Matrix SU3Matrix::eigenvalues() const {
+//   Eigen::Matrix3cd eigenMatrix;
+//   for (int i = 0; i < 3; i++) {
+//     for (int j = 0; j < 3; j++) {
+//       eigenMatrix(i, j) = this->operator()(i, j);
+//     }
+//   }
 
-SU3Matrix SU3Matrix::matrixSqrt() const {
-  // Step 1: Convert this SU3Matrix to Eigen::Matrix3cd
-  Eigen::Matrix3cd eigenMatrix;
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      eigenMatrix(i, j) = this->operator()(i, j);
-    }
-  }
+//   // Step 2: Compute the matrix square root using Eigen
+//   Eigen::ComplexEigenSolver<Eigen::Matrix3cd> solver(eigenMatrix);
+//   Eigen::Matrix3cd D = solver.eigenvalues().asDiagonal();
 
-  // Step 2: Compute the matrix square root using Eigen
-  Eigen::ComplexEigenSolver<Eigen::Matrix3cd> solver(eigenMatrix);
-  Eigen::Matrix3cd D = solver.eigenvalues().asDiagonal();
-  Eigen::Matrix3cd V = solver.eigenvectors();
-  for (int i = 0; i < D.rows(); ++i) {
-    D(i, i) = std::sqrt(D(i, i));
-  }
-  Eigen::Matrix3cd sqrtEigenMatrix = V * D * V.inverse();
+//   // Step 3: Convert the result back to SU3Matrix format and return
+//   Matrix Diag(su3, std::vector<Complex>(su3));
+//   for (int i = 0; i < 3; i++) {
+//     for (int j = 0; j < 3; j++) {
+//       Diag[i][j] = D(i, j);
+//     }
+//   }
+//   return SU3Matrix(Diag);
+// }
 
-  // Step 3: Convert the result back to SU3Matrix format and return
-  Matrix sqrtElements(su3, std::vector<Complex>(su3));
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      sqrtElements[i][j] = sqrtEigenMatrix(i, j);
-    }
-  }
-  return SU3Matrix(sqrtElements);
-}
+// SU3Matrix SU3Matrix::matrixSqrt() const {
+//   // Step 1: Convert this SU3Matrix to Eigen::Matrix3cd
+//   Eigen::Matrix3cd eigenMatrix;
+//   for (int i = 0; i < 3; i++) {
+//     for (int j = 0; j < 3; j++) {
+//       eigenMatrix(i, j) = this->operator()(i, j);
+//     }
+//   }
+
+//   // Step 2: Compute the matrix square root using Eigen
+//   Eigen::ComplexEigenSolver<Eigen::Matrix3cd> solver(eigenMatrix);
+//   Eigen::Matrix3cd D = solver.eigenvalues().asDiagonal();
+//   Eigen::Matrix3cd V = solver.eigenvectors();
+//   for (int i = 0; i < D.rows(); ++i) {
+//     D(i, i) = std::sqrt(D(i, i));
+//   }
+//   Eigen::Matrix3cd sqrtEigenMatrix = V * D * V.inverse();
+
+//   // Step 3: Convert the result back to SU3Matrix format and return
+//   Matrix sqrtElements(su3, std::vector<Complex>(su3));
+//   for (int i = 0; i < 3; i++) {
+//     for (int j = 0; j < 3; j++) {
+//       sqrtElements[i][j] = sqrtEigenMatrix(i, j);
+//     }
+//   }
+//   return SU3Matrix(sqrtElements);
+// }
+//-------------------------------------------------------------------------------
 
 void SU3Matrix::unitarize() {
+  // project into SU(3) BONATI :
+  // https://github.com/coppolachan/RHMC-on-GPU/blob/master/lib/Action/su3.cc#L69
 
   double norm = 0.0;
 
@@ -330,6 +363,51 @@ void SU3Matrix::unitarize() {
 
   prod = elements_[0][0] * elements_[1][1] - elements_[0][1] * elements_[1][0];
   elements_[2][2] = std::conj(prod);
+}
+
+void SU3Matrix::gramSchmidtQR() {
+
+  SU3Matrix &Q = *this;
+  SU3Matrix R;
+
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < i; ++j) {
+      subtract_projection(Q, i, Q, j);
+    }
+    normalize(Q, i);
+  }
+
+  for (int i = 0; i < 3; ++i) {
+    for (int j = i; j < 3; ++j) {
+      R(i, j) = dot(*this, j, Q, i);
+    }
+  }
+
+  *this = Q * R;
+}
+
+complex<double> SU3Matrix::dot(const SU3Matrix &A, int col1, const SU3Matrix &B,
+                               int col2) {
+  complex<double> sum = 0;
+  for (int i = 0; i < 3; ++i) {
+    sum += A(i, col1) * B(i, col2);
+  }
+  return sum;
+}
+
+void SU3Matrix::subtract_projection(SU3Matrix &A, int col, const SU3Matrix &Q,
+                                    int q_col) {
+  complex<double> scalar = dot(A, col, Q, q_col);
+  for (int i = 0; i < 3; ++i) {
+    A(i, col) -= scalar * Q(i, q_col);
+  }
+}
+
+void SU3Matrix::normalize(SU3Matrix &A, int col) {
+  complex<double> norm = sqrt(dot(A, col, A, col));
+  for (int i = 0; i < 3; ++i) {
+    A(i, col) /= norm;
+  }
 }
 
 // -------------end of class functions
@@ -426,9 +504,10 @@ SU3Matrix su3_generator() {
 // // // // // TESTED AND WORKS FINE
 // int main() {
 
-//   for (int i = 0; i < 2; i++) {
-//     SU3Matrix prova = IdentityMatrix() * 0.5;
-//     SU3Matrix sqr = prova.matrixSqrt();
-//     sqr.print();
+//   for (int i = 0; i < 1; i++) {
+//     SU3Matrix prova = su3_generator();
+//     prova.print();
+//     prova.gramSchmidtQR();
+//     prova.print();
 //   }
 // }

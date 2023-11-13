@@ -34,11 +34,13 @@ public:
   SU3Matrix operator+(const Complex &other) const; // scalar addition
   SU3Matrix operator-(const Complex &other) const; // scalar subtraction
   SU3Matrix &operator*=(const Complex &rhs);
+  SU3Matrix &operator/=(const Complex &rhs);
   SU3Matrix &operator+=(const SU3Matrix &rhs);
   SU3Matrix &operator*=(const SU3Matrix &rhs);
 
   SU3Matrix matrixSqrt() const;
   SU3Matrix eigenvectors() const;
+  SU3Matrix eigenvalues() const;
   SU3Matrix inv();
 
   Complex &operator()(int row, int col);
@@ -54,6 +56,12 @@ public:
   Complex tr() const;
   double reTr() const;
   void unitarize();
+  void gramSchmidtQR();
+  complex<double> dot(const SU3Matrix &A, int col1, const SU3Matrix &B,
+                      int col2);
+  void subtract_projection(SU3Matrix &A, int col, const SU3Matrix &Q,
+                           int q_col);
+  void normalize(SU3Matrix &A, int col);
 
 private:
   Matrix elements_;

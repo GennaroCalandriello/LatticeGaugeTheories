@@ -49,6 +49,30 @@ SU2Matrix SU2Matrix::operator*(const SU2Matrix &other) const {
   return SU2Matrix(result);
 }
 
+SU2Matrix SU2Matrix::operator*(const double &rhs) const {
+  // sintax is Matrix*complex
+  SU2Matrix result;
+
+  for (int i = 0; i < 2; i++) {
+    for (int j = 0; j < 2; j++) {
+      result(i, j) = this->elements_[i][j] * rhs;
+    }
+  }
+
+  return result;
+}
+SU2Matrix SU2Matrix::operator*(const Complex &rhs) const {
+  // sintax is Matrix*complex
+  SU2Matrix result;
+
+  for (int i = 0; i < 2; i++) {
+    for (int j = 0; j < 2; j++) {
+      result(i, j) = this->elements_[i][j] * rhs;
+    }
+  }
+
+  return result;
+}
 SU2Matrix &SU2Matrix::operator+=(const SU2Matrix &rhs) {
   for (int i = 0; i < su2; ++i) {
     for (int j = 0; j < su2; ++j) {
@@ -68,6 +92,23 @@ SU2Matrix &SU2Matrix::operator*=(const SU2Matrix &rhs) {
     }
   }
   elements_ = result;
+  return *this;
+}
+SU2Matrix &SU2Matrix::operator/=(const Complex &rhs) {
+  for (int i = 0; i < su2; ++i) {
+    for (int j = 0; j < su2; ++j) {
+      elements_[i][j] /= rhs;
+    }
+  }
+  return *this;
+}
+
+SU2Matrix &SU2Matrix::operator/=(const double &rhs) {
+  for (int i = 0; i < su2; ++i) {
+    for (int j = 0; j < su2; ++j) {
+      elements_[i][j] /= rhs;
+    }
+  }
   return *this;
 }
 
@@ -178,8 +219,18 @@ SU2Matrix su2_generator() {
 }
 
 // int main() {
-//   SU2Matrix susu = su2_generator();
-//   susu.print();
-//   cout << susu.det() << endl;
+//   SU2Matrix s1 = su2_generator();
+//   SU2Matrix s2 = su2_generator();
+//   SU2Matrix s3 = su2_generator();
+//   SU2Matrix s4 = su2_generator();
+//   SU2Matrix s5 = su2_generator();
+//   SU2Matrix s6 = su2_generator();
+
+//   SU2Matrix prod = s1 * s2 * s3 + s4 * s5 * s6;
+//   prod.print();
+//   complex<double> det = sqrt(prod.det());
+//   prod /= det;
+//   cout << "det" << prod.det() << endl;
+//   prod.print();
 //   return 0;
 // }
