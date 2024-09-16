@@ -22,4 +22,6 @@ on a 74 lattice for 10000 configurations using 1 Heat-Bath and 2 Over-Relaxation
 <img src="https://github.com/GennaroCalandriello/LatticeGaugeTheories/blob/main/PythonVersion/images/polyakov5.7hbor.png" alt="Loop di Polyakov" width="500">
 <img src="https://github.com/GennaroCalandriello/LatticeGaugeTheories/blob/main/PythonVersion/images/polyakov6.2hbor.png" alt="Loop di Polyakov" width="500">
 <img src="https://github.com/GennaroCalandriello/LatticeGaugeTheories/blob/main/PythonVersion/images/polyakov8.9hbor.png" alt="Loop di Polyakov" width="500">
-<img src="https://github.com/GennaroCalandriello/LatticeGaugeTheories/blob/main/PythonVersion/images/polyakov5.7hbor.png" alt="Loop di Polyakov" width="500">
+Here, the expectation value of the Polyakov loop. The non-zero expectation value represents the
+transition to the deconfined phase at β ∼ 5.7:
+<img src="https://github.com/GennaroCalandriello/LatticeGaugeTheories/blob/main/PythonVersion/images/polyvsbeta.png" alt="Loop di Polyakov" width="500">
