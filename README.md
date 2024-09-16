@@ -18,5 +18,5 @@ Here another result for SU(2)- Higgs coupling obtained varying k (Higgs coupling
 # Deconfinement transition: Polyakov loops expectation values
 ![Polyakov loops on the Re-Im plane, signaling the Z3 symmetry breaking with the
 generation of 3 distinct vacua. We compute the average of the bare Polyakov loop
-on a 74 lattice for 10000 configurations using 1 Heat-Bath and 2 Over-Relaxation updates.](https://github.com/GennaroCalandriello/LatticeGaugeTheories/blob/main/PythonVersion/images/polyakov5.7hbor.png)
-
+on a 74 lattice for 10000 configurations using 1 Heat-Bath and 2 Over-Relaxation updates.]()
+<img src="https://github.com/GennaroCalandriello/LatticeGaugeTheories/blob/main/PythonVersion/images/polyakov5.7hbor.png" alt="Loop di Polyakov" width="500">
