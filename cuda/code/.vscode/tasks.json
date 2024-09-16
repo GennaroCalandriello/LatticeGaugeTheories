@@ -8,8 +8,8 @@
             "command": "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6/bin/nvcc.exe",
             "args": [
                 "-o",
-                "random",
-                "random.cu",
+                "su2",
+                "su2.cu",
                 "-lcurand",  // Collega la libreria cuRAND
             ],
             "group": {
